@@ -74,3 +74,20 @@ test('place forms and estimates stay consistent through thousandths',()=>{
   each('powers-of-ten',p=>{const m=p.prompt.match(/in ([\d.]+) (÷|×) 10([¹²³])/),scale=10**('¹²³'.indexOf(m[3])+1);
     close(p.steps.at(-1).answer,m[2]==='×'?+m[1]*scale:+m[1]/scale,p.prompt);});
 });
+
+test('the rounding lesson distinguishes the left endpoint from the rounded whole and grades ties at each place',()=>{
+  const lesson=byId('decimal-round');
+  const start=lesson.make(1,0,random(1));
+  assert.match(start.prompt,/1.77 to the nearest whole number/);
+  assert.match(start.steps[0].prompt,/left endpoint/);
+  assert.match(start.steps.at(-1).prompt,/rounded answer/);
+  assert.deepEqual(start.steps.map(s=>s.answer),['1','1.5','Above','2']);
+  for(let level=1;level<=3;level++){
+    const tie=lesson.make(level,4,random(12));
+    assert.equal(tie.steps[2].answer,'At the midpoint');
+    assert.equal(Number(tie.steps.at(-1).answer),tie.model.max);
+    const below=lesson.make(level,2,()=>0);
+    assert.equal(below.steps[2].answer,'Below');
+    assert.equal(Number(below.steps.at(-1).answer),below.model.min);
+  }
+});

@@ -89,9 +89,22 @@
   function newCampaign(eraId = 'modern') {
     return {
       map:mapKey(eraId), mathMode:'curriculum', capitalId:null, seatId:null, administration:{}, owned:[], targetId:null, inBattle:false, garrisons:{},
-      empireName:'Your empire', peakHoldings:0, turn:0, spells:0, lastProblem:null, rivals:[], nextRival:1,
+      empireName:'Your empire', activeEmpireId:'player', empireTurns:{}, peakHoldings:0, turn:0, spells:0, lastProblem:null, rivals:[], nextRival:1,
       rivalMoves:[], raceGoal:null, winner:null
     };
+  }
+
+  function prepareEmpires(c) {
+    c.activeEmpireId ??= 'player';
+    c.empireTurns ??= {};
+    for (const r of c.rivals) {
+      r.control ??= 'ai';
+      r.seatId ??= r.owned.includes(r.homeId) ? r.homeId : r.owned[0] ?? null;
+      r.peakHoldings = Math.max(r.peakHoldings ?? 0,r.owned.length);
+      r.administration ??= {};
+      r.spells ??= 0;
+      r.lastProblem ??= null;
+    }
   }
 
   function newRegion(recommended) {
@@ -277,8 +290,9 @@
           }
           state.campaign.mathMode ??= 'curriculum';
           state.campaign.administration ??= {};
-          state.campaign.seatId ??= state.campaign.capitalId;
+          state.campaign.seatId ??= state.campaign.owned.includes(state.campaign.capitalId) ? state.campaign.capitalId : state.campaign.owned[0] ?? null;
           upgradePacing(state, board);
+          prepareEmpires(state.campaign);
           if (!state.lessonBook) {
             state.lessonBook = {activeId:null, autoId:null, serial:0, runs:[], legacyCount:state.stats.count};
             importParkedWork();
@@ -364,12 +378,14 @@
     function activeRun() { return findRun(state.lessonBook.activeId); }
     function context() {
       const c = state.campaign;
-      return {world:state.world, nationId:c.inBattle ? c.targetId : null, eraId:state.eraId};
+      return {world:state.world, nationId:c.inBattle ? c.targetId : null, eraId:state.eraId,
+        ...(c.activeEmpireId==='player'?{}:{empireId:c.activeEmpireId})};
     }
     function slot(location, run) {
       const era = location.eraId && location.eraId !== 'modern' ? location.eraId + '/' : '';
       const area = location.nationId == null ? 'training' : 'country:' + location.nationId;
-      return era + area + (run?.lessonId ? '' : ':' + location.world);
+      const side = location.empireId && location.empireId !== 'player' ? location.empireId + '/' : '';
+      return era + side + area + (run?.lessonId ? '' : ':' + location.world);
     }
     function createRun(lessonId, difficulty) {
       const book = state.lessonBook, now = clock();
@@ -411,7 +427,7 @@
       const current = activeRun()?.id === run.id ? state.round : null;
       const pending = [current, ...Object.values(run.parked)].filter(r => r && !r.receipt)
         .map(r => ({roundId:r.id, eraId:r.eraId || 'modern', nationId:r.nationId, world:r.world,
-          lessonId:lessonForRound(r)?.lessonId, hasWork:!!r.draft}));
+          lessonId:lessonForRound(r)?.lessonId, ...(r.empireId?{empireId:r.empireId}:{}), hasWork:!!r.draft}));
       const parked=run.parked[run.recoveryKey] || run.parked[slot(run.location,run)];
       const recent=run.history[run.history.length-1];
       const displayLessonId=run.lessonId || lessonForRound(current || parked)?.lessonId ||
@@ -451,19 +467,20 @@
       return true;
     }
     function defenderAt(id) {
-      if (id === null || id === state.campaign.capitalId) return null;
+      const actor = currentEmpire();
+      if (id === null || (id === homeOf(actor) && actor.owned.includes(id))) return null;
       const nation = board.NATIONS[id];
-      const health = state.campaign.owned.includes(id) ? 0 : state.campaign.garrisons[id]?.hp;
+      const health = actor.owned.includes(id) ? 0 : state.campaign.garrisons[id]?.hp;
       return enemy(nation.biome, nation.rank, nation.variant, health, true);
     }
     function frontier() {
-      const { owned } = state.campaign;
+      const { owned } = currentEmpire();
       return board.NATIONS.filter(n => !owned.includes(n.id) && n.neighbors.some(id => owned.includes(id))).map(n => n.id);
     }
     function countryProfile(id) {
       const original = capitals.get(id);
       const nation = board.NATIONS[id];
-      const changes = state.campaign.administration[id] || {};
+      const changes = currentEmpire().administration[id] || {};
       return {
         countryName:changes.countryName ?? nation.name, capitalName:changes.capitalName ?? original.name,
         x:changes.x ?? original.x, y:changes.y ?? original.y, originalCountryName:nation.name,
@@ -473,7 +490,7 @@
       };
     }
     function updateCountry(id, fields) {
-      const c = state.campaign;
+      const c = currentEmpire();
       if (!c.owned.includes(id) || !fields || typeof fields !== 'object' || Array.isArray(fields)) return false;
       const validKeys = ['countryName','capitalName','x','y','resetLocation','seat'];
       if (Object.keys(fields).some(k => !validKeys.includes(k))) return false;
@@ -506,7 +523,7 @@
       return true;
     }
     function progression() {
-      const c = state.campaign;
+      const c = currentEmpire();
       const level = levelAt(c.peakHoldings);
       const band = CAMPAIGN_LEVELS[level];
       const next = CAMPAIGN_LEVELS[level + 1];
@@ -515,7 +532,7 @@
       return {tier:level + 1, label:band.label, world, bandWorld:band.world, nextAt:next?.at ?? null, nextLabel:next?.label ?? null};
     }
     function campaignLesson() {
-      const c = state.campaign, level = progression();
+      const c = currentEmpire(), level = progression();
       const tier = level.tier;
       const pairs = tier === 4 ? c.spells % 3 === 0 : tier === 5 ? c.spells % 2 === 0 : tier === 6 && c.spells % 3 !== 2;
       const pair = state.world !== 5 && (pairs || (state.world === SCHOOLWORK && c.spells % 2 === 1));
@@ -562,6 +579,19 @@
       const region=state.regions[state.world], count=region.practiceSpells ?? region.stats.count;
       return classicTopic(state.world,state.world===SCHOOLWORK && count%2===1);
     }
+    // The founding empire retains its legacy save fields. Every other empire has
+    // a stable rival ID regardless of whether its turns are human or automatic.
+    function empire(id) {
+      return id==='player' ? state.campaign : state.campaign.rivals.find(r=>r.id===id);
+    }
+    function currentEmpire() { return empire(state.campaign.activeEmpireId); }
+    function homeOf(side) { return side===state.campaign ? side.capitalId : side.homeId; }
+    function empireSummary(side) {
+      if (side===state.campaign) return {id:'player',name:side.empireName,color:'#e5bb64',control:'manual',
+        homeId:side.capitalId,seatId:side.seatId,owned:side.owned.slice()};
+      return {id:side.id,name:side.name,color:side.color,control:side.control,
+        homeId:side.homeId,seatId:side.seatId,owned:side.owned.slice()};
+    }
     function ownerMap() {
       const c = state.campaign, map = {};
       for (const id of c.owned) map[id] = 'player';
@@ -569,28 +599,39 @@
       return map;
     }
     function setEmpireName(raw) {
-      const c = state.campaign, name = factionName(raw);
-      if (!name || c.rivals.some(r => r.name.toLowerCase() === name.toLowerCase())) return false;
-      c.empireName = name;
+      const c=state.campaign, side=currentEmpire(), name=factionName(raw);
+      if (!name || [c,...c.rivals].some(r=>r!==side && (r===c?c.empireName:r.name).toLowerCase()===name.toLowerCase())) return false;
+      if (side===c) c.empireName=name;
+      else side.name=name;
       save();
       return true;
     }
-    function addRival(rawName, homeId) {
+    function addRival(rawName, homeId, control='ai') {
       const c = state.campaign, name = factionName(rawName);
-      if (!name || c.capitalId === null || c.rivals.length >= rivalColors.length || c.winner ||
+      if (!['ai','manual'].includes(control) || !name || c.capitalId === null || c.rivals.length >= rivalColors.length || c.winner ||
           !numberIn(homeId, 0, board.NATIONS.length - 1) || ownerMap()[homeId] || homeId === c.targetId ||
+          Object.values(c.empireTurns).some(turn=>turn.targetId===homeId) || homeId===c.capitalId ||
           c.rivals.some(r => r.homeId === homeId || r.name.toLowerCase() === name.toLowerCase()) ||
           name.toLowerCase() === c.empireName.toLowerCase()) return false;
       const color = rivalColors.find(value => !c.rivals.some(r => r.color === value));
-      c.rivals.push({id:'r' + c.nextRival++, name, color, homeId, owned:[homeId]});
+      c.rivals.push({id:'r' + c.nextRival++, name, color, control, homeId, seatId:homeId, owned:[homeId],
+        peakHoldings:1,spells:0,lastProblem:null,administration:{}});
       c.raceGoal ??= Math.min(board.NATIONS.length, Math.max(12, c.owned.length + 5));
+      save();
+      return true;
+    }
+    function setEmpireControl(id,control) {
+      const c=state.campaign,r=c.rivals.find(r=>r.id===id);
+      if (!r || !['ai','manual'].includes(control) || (id===c.activeEmpireId && control==='ai')) return false;
+      r.control=control;
       save();
       return true;
     }
     function removeRival(id) {
       const c = state.campaign;
-      if (!c.rivals.some(r => r.id === id)) return false;
+      if (id===c.activeEmpireId || !c.rivals.some(r => r.id === id)) return false;
       c.rivals = c.rivals.filter(r => r.id !== id);
+      delete c.empireTurns[id];
       c.rivalMoves = c.rivalMoves.filter(m => m.rivalId !== id);
       if (!c.rivals.length) { c.raceGoal = null; c.winner = null; }
       else if (c.winner === id) {
@@ -600,51 +641,65 @@
       save();
       return true;
     }
+    function takeCountry(side,id,previousId) {
+      const c=state.campaign, previous=previousId && empire(previousId);
+      if (previous) {
+        previous.owned=previous.owned.filter(holding=>holding!==id);
+        if (previous.seatId===id) previous.seatId=previous.owned.includes(homeOf(previous)) ? homeOf(previous) : previous.owned[0] ?? null;
+      }
+      side.owned.push(id);
+      side.peakHoldings=Math.max(side.peakHoldings,side.owned.length);
+      // A change of flag replaces the defender. Unfinished mathematics is still
+      // parked in its original lesson and empire, never transferred to the captor.
+      const n=board.NATIONS[id], maxHp=enemy(n.biome,n.rank,n.variant,null,true).maxHp;
+      for (const turn of [c,...Object.values(c.empireTurns)]) {
+        if (turn.garrisons[id]) turn.garrisons[id].hp=maxHp;
+      }
+    }
+    function wonRace(side) {
+      const c=state.campaign;
+      return side.owned.length>=c.raceGoal || [c,...c.rivals].every(r=>r===side || !r.owned.length);
+    }
     function advanceRivals(capturedId) {
-      const c = state.campaign;
+      const c = state.campaign,actor=currentEmpire();
       c.rivalMoves = [];
       if (!c.rivals.length || c.winner) return;
-      if (c.owned.length >= c.raceGoal || c.rivals.every(r => !r.owned.length)) { c.winner = 'player'; return; }
+      if (wonRace(actor)) { c.winner = c.activeEmpireId; return; }
       const owners = ownerMap();
-      // Nobody loses their founding country to a CPU or a country they just won
-      // this turn. The human can still challenge rival capitals and finish the map.
-      const protectedIds = new Set([c.capitalId, capturedId, ...c.rivals.filter(r => r.owned.includes(r.homeId)).map(r => r.homeId)]);
+      // Humans can challenge founding countries. Automated moves protect all
+      // still-held founding countries and the country just won by the active human.
+      const protectedIds = new Set([capturedId,...[c,...c.rivals].filter(r=>r.owned.includes(homeOf(r))).map(homeOf)]);
       for (const [index, rival] of c.rivals.entries()) {
+        if (rival.control!=='ai') continue;
         const adjacent = new Set(rival.owned.flatMap(id => board.NATIONS[id].neighbors));
         const targets = [...adjacent].filter(id => owners[id] !== rival.id && !protectedIds.has(id)).sort((a,b) => a-b);
         if (!targets.length) continue;
         const contest = (c.turn + index) % 3 === 0;
-        const preferred = targets.filter(id => contest ? owners[id] === 'player' : !owners[id]);
+        const preferred = targets.filter(id => contest ? owners[id] === c.activeEmpireId : !owners[id]);
         const choices = preferred.length ? preferred : targets;
         const countryId = choices[(c.turn + rival.homeId + index) % choices.length];
         const from = owners[countryId] ?? null;
-        if (from === 'player') {
-          c.owned = c.owned.filter(id => id !== countryId);
-          if (c.seatId === countryId) c.seatId = c.capitalId;
-        } else if (from) {
-          const previous = c.rivals.find(r => r.id === from);
-          previous.owned = previous.owned.filter(id => id !== countryId);
-        }
-        rival.owned.push(countryId);
+        takeCountry(rival,countryId,from);
         owners[countryId] = rival.id;
         protectedIds.add(countryId);
         c.rivalMoves.push({rivalId:rival.id, name:rival.name, countryId, from});
-        if (rival.owned.length >= c.raceGoal) { c.winner = rival.id; break; }
+        if (wonRace(rival)) { c.winner = rival.id; break; }
       }
     }
     function campaignView() {
-      const c = state.campaign;
-      const defenders = Object.fromEntries(board.NATIONS.filter(n => n.id !== c.capitalId).map(n => [n.id, defenderAt(n.id)]));
+      const c = state.campaign, side=currentEmpire(),activeEmpire=empireSummary(side);
+      const defenders = Object.fromEntries(board.NATIONS.filter(n => n.id!==homeOf(side) || !side.owned.includes(n.id)).map(n => [n.id, defenderAt(n.id)]));
+      const rivals=c.rivals.map(empireSummary),empires=[empireSummary(c),...rivals];
       return {
         eraId:state.eraId, board, capitals, campaignMath:c.mathMode,
-        mathMode:activeRun()?.lessonId ? 'fixed' : c.mathMode, plannedLesson:plannedLesson(), empireName:c.empireName, peakHoldings:c.peakHoldings, progression:progression(), turn:c.turn,
-        rivals:c.rivals.map(r => ({...r, owned:r.owned.slice()})), owners:ownerMap(),
+        mathMode:activeRun()?.lessonId ? 'fixed' : c.mathMode, plannedLesson:plannedLesson(), empireName:activeEmpire.name, peakHoldings:side.peakHoldings, progression:progression(), turn:c.turn,
+        activeEmpireId:c.activeEmpireId, activeEmpire, empires, rivals, owners:ownerMap(),
         rivalMoves:c.rivalMoves.map(m => ({...m})), raceGoal:c.raceGoal, winner:c.winner,
-        administration: Object.fromEntries(c.owned.map(id => [id, countryProfile(id)])), seatId:c.seatId,
-        nations: board.NATIONS, capitalId: c.capitalId ?? board.CAPITAL_ID, needsCapital: c.capitalId === null,
-        owned: c.owned.slice(), frontier: frontier(),
-        targetId: c.targetId, inBattle: c.inBattle, victory: c.owned.length === board.NATIONS.length,
-        claimed: c.owned.length, total: board.NATIONS.length, defenders, defender: defenders[c.targetId] || null
+        administration: Object.fromEntries(side.owned.map(id => [id, countryProfile(id)])), seatId:side.seatId,
+        nations: board.NATIONS, capitalId: homeOf(side) ?? board.CAPITAL_ID, needsCapital: c.capitalId === null,
+        owned: side.owned.slice(), frontier: frontier(),
+        targetId: c.targetId, inBattle: c.inBattle, victory: side.owned.length === board.NATIONS.length,
+        claimed: side.owned.length, total: board.NATIONS.length, defenders, defender: defenders[c.targetId] || null
       };
     }
     function chooseCapital(id) {
@@ -676,6 +731,7 @@
         run.location = place;
         round.practiceWorld = place.world;
         round.eraId = place.eraId;
+        if (place.empireId) round.empireId=place.empireId;
         const key = round.recoveryKey || slot(place,run);
         if (round.recoveryKey) run.recoveryKey = round.recoveryKey;
         if (!round.receipt?.capture) run.parked[key] = round;
@@ -692,7 +748,7 @@
       if (run) {
         const selectedKey = roundId == null ? null : Object.keys(run.parked).find(k => run.parked[k].id === roundId);
         const recovery = run.parked[run.recoveryKey];
-        const preferred = place.nationId == null && recovery && (recovery.eraId || 'modern') === place.eraId ? run.recoveryKey : slot(place,run);
+        const preferred = place.nationId == null && recovery && (recovery.eraId || 'modern') === place.eraId && (recovery.empireId || 'player') === (place.empireId || 'player') ? run.recoveryKey : slot(place,run);
         const key = selectedKey ?? preferred;
         state.round = run.parked[key] ?? null;
         delete run.parked[key];
@@ -701,6 +757,7 @@
       // Saves made before the lesson library stored automatic work under its world or garrison.
       if (!state.round && !run?.lessonId) {
         if (place.nationId === null) {
+          if (place.empireId && place.empireId!=='player') return;
           const region = state.regions[place.world];
           state.round = region.parkedRound;
           region.parkedRound = null;
@@ -710,6 +767,33 @@
           if (garrison) delete garrison.rounds[place.world];
         }
       }
+    }
+    function switchEmpire(id) {
+      const c=state.campaign, next=empire(id);
+      if (!next || (next!==c && next.control!=='manual') || !next.owned.length) return false;
+      if (c.activeEmpireId===id) return true;
+      stopClock();
+      const captured=state.round?.receipt?.capture ? state.round : null;
+      parkCurrent();
+      c.empireTurns[c.activeEmpireId]={targetId:c.targetId,inBattle:c.inBattle,garrisons:c.garrisons,captured,
+        world:state.world,runId:state.lessonBook.activeId,autoId:state.lessonBook.autoId};
+      const turn=c.empireTurns[id];
+      delete c.empireTurns[id];
+      c.activeEmpireId=id;
+      c.garrisons=turn?.garrisons || {};
+      c.targetId=turn?.targetId ?? null;
+      const keepReceipt=turn?.captured && next.owned.includes(c.targetId);
+      const canResume=c.targetId!==null && frontier().includes(c.targetId);
+      c.inBattle=!!turn?.inBattle && !!(canResume || keepReceipt);
+      if (!canResume && !keepReceipt) c.targetId=null;
+      if (turn) {
+        state.world=turn.world;
+        state.lessonBook.activeId=turn.runId;
+        state.lessonBook.autoId=turn.autoId;
+      }
+      state.round=keepReceipt ? turn.captured : null;
+      if (!state.round) restoreCurrent();
+      return setScreen('campaign');
     }
     function switchEra(id) {
       const era = eraData(id);
@@ -726,6 +810,7 @@
       board = era.board;
       capitals = era.capitals;
       state.campaign = old?.campaign || newCampaign(id);
+      prepareEmpires(state.campaign);
       state.campaign.mathMode ??= 'curriculum';
       state.screen = old?.screen || 'campaign';
       if (old) {
@@ -742,7 +827,7 @@
     function invade(id) {
       if (!numberIn(id, 0, board.NATIONS.length - 1) || !frontier().includes(id)) return false;
       const c = state.campaign;
-      if (c.inBattle && c.targetId === id) return setScreen('battle');
+      if (c.inBattle && c.targetId === id && !state.round?.receipt?.capture) return setScreen('battle');
       parkCurrent();
       c.garrisons[id] ??= { hp: defenderAt(id).maxHp, rounds: {} };
       c.targetId = id;
@@ -755,7 +840,7 @@
       const c = state.campaign;
       if (!c.inBattle) return;
       parkCurrent();
-      if (c.owned.includes(c.targetId)) c.targetId = null;
+      if (currentEmpire().owned.includes(c.targetId)) c.targetId = null;
       c.inBattle = false;
       restoreCurrent();
     }
@@ -764,7 +849,7 @@
       return setScreen('campaign');
     }
     function releaseCapture() {
-      if (state.round?.receipt?.capture || (state.campaign.inBattle && state.campaign.owned.includes(state.campaign.targetId))) restoreTraining();
+      if (state.round?.receipt?.capture || (state.campaign.inBattle && currentEmpire().owned.includes(state.campaign.targetId))) restoreTraining();
     }
     function startLesson(lessonId, difficulty) {
       if (!numberIn(difficulty,1,3) || !lessons()?.has(lessonId)) return false;
@@ -783,22 +868,25 @@
       }
       const selected = roundId == null ? null : Object.values(run.parked).find(r => r.id === roundId && !r.receipt);
       if (roundId != null && !selected) return false;
-      const target = selected ? {eraId:selected.eraId || 'modern', nationId:selected.nationId, world:selected.practiceWorld ?? run.location.world}
+      const target = selected ? {eraId:selected.eraId || 'modern', empireId:selected.empireId || 'player', nationId:selected.nationId, world:selected.practiceWorld ?? run.location.world}
         : {eraId:'modern', ...run.location};
       if (target.eraId !== state.eraId && !switchEra(target.eraId)) return false;
+      const empireId=target.empireId || 'player';
+      const sameEmpire=state.campaign.activeEmpireId===empireId || switchEmpire(empireId);
+      if (sameEmpire && selected && state.round?.id===selected.id) return setScreen('battle');
       releaseCapture();
       parkCurrent();
       state.lessonBook.activeId = run.id;
       if (run.automatic) state.lessonBook.autoId = run.id;
       state.world = target.world;
       const c = state.campaign;
-      const canFight = target.nationId != null && frontier().includes(target.nationId);
+      const canFight = sameEmpire && target.nationId != null && frontier().includes(target.nationId);
       c.inBattle = canFight;
       if (canFight) {
         c.targetId = target.nationId;
         c.garrisons[c.targetId] ??= {hp:defenderAt(c.targetId).maxHp, rounds:{}};
-      } else if (c.targetId != null && c.owned.includes(c.targetId)) c.targetId = null;
-      const stranded = !canFight && target.nationId != null ? run.parked[slot(target,run)] : null;
+      } else if (c.targetId != null && currentEmpire().owned.includes(c.targetId)) c.targetId = null;
+      const stranded = !canFight && (target.nationId != null || !sameEmpire) ? run.parked[slot(target,run)] : null;
       if (stranded && !stranded.receipt) {
         // Another session may have already captured this target. Retain the
         // unfinished mathematics in practice, without reopening the country.
@@ -806,6 +894,7 @@
         stranded.recoveryKey = 'retired:' + stranded.id;
         run.recoveryKey = stranded.recoveryKey;
         stranded.nationId = null;
+        stranded.empireId=c.activeEmpireId;
         stranded.campaignTier = null;
         state.round = stranded;
         run.location = context();
@@ -854,7 +943,7 @@
         const lesson = c.inBattle ? campaignLesson() : {world:state.world, tier:0, pair:false};
         const region = state.regions[lesson.world];
         const count = c.inBattle ? region.stats.count : region.practiceSpells ?? region.stats.count;
-        const first = count === 0 && !lesson.pair && (!c.inBattle || c.peakHoldings <= 1);
+        const first = count === 0 && !lesson.pair && (!c.inBattle || currentEmpire().peakHoldings <= 1);
         const pair = lesson.pair || (!c.inBattle && lesson.world === SCHOOLWORK && count % 2 === 1);
         const campaignCarry = c.inBattle && lesson.tier >= 3 && lesson.world <= 4;
         const selected = run.lessonId ? {lessonId:run.lessonId, difficulty:run.difficulty} : c.inBattle ? plannedLesson() : null;
@@ -867,13 +956,14 @@
           if (!run.lessonId) issued[key] = index + 1;
         } else {
           problem = makeProblem(lesson.world, {first, pair, tier:lesson.tier, focus:campaignCarry ? 'regroup' : focusFor(region),
-            avoid:c.inBattle ? c.lastProblem : null});
+            avoid:c.inBattle ? currentEmpire().lastProblem : null});
         }
         state.round = {
           id: ++state.serial, world:selected ? (problem.kind === 'lesson' ? state.world : problem.world) : lesson.world,
           mode:state.settings.mode, problem, practiceWorld:state.world, eraId:state.eraId, nationId:c.inBattle ? c.targetId : null,
           campaignTier:!selected && c.inBattle ? lesson.tier : null, draft:null, receipt:null
         };
+        if (c.activeEmpireId!=='player') state.round.empireId=c.activeEmpireId;
         if (selected) Object.assign(state.round,selected);
         if (c.inBattle) state.round.campaignMath = run.lessonId ? 'fixed' : selected ? 'curriculum' : 'classic';
         run.created++;
@@ -901,8 +991,9 @@
       const c = state.campaign;
       const combatRegion = state.regions[state.world];
       const decimal = round.problem.kind !== 'lesson';
+      if ((round.empireId || 'player')!==c.activeEmpireId ||
+          (c.inBattle && (!c.garrisons[c.targetId] || round.nationId !== c.targetId || !frontier().includes(c.targetId)))) return null;
       const enemy = c.inBattle ? defenderAt(c.targetId) : enemyAt(state.world, combatRegion);
-      if (c.inBattle && (!c.garrisons[c.targetId] || round.nationId !== c.targetId)) return null;
       const errors = {};
       for (const k of Object.keys(SKILLS)) {
         const count = result.errors?.[k];
@@ -932,6 +1023,7 @@
       const run = findRun(round.lessonSessionId) || ensureRun();
       entry.lessonSessionId = run.id;
       entry.eraId = state.eraId;
+      if (c.inBattle) entry.empireId=c.activeEmpireId;
       if (round.lessonId) { entry.lessonId = round.lessonId; entry.difficulty = round.difficulty; }
       addStats(state.stats, entry);
       if (decimal) {
@@ -945,24 +1037,23 @@
       if (c.inBattle) {
         // A resumed legacy draft counts towards learning and rewards, without
         // consuming the first scheduled puzzle in the new campaign sequence.
-        if (round.campaignTier) c.spells++;
-        if (!round.lessonId) c.lastProblem = round.problem;
+        const side=currentEmpire();
+        if (round.campaignTier) side.spells++;
+        if (!round.lessonId) side.lastProblem = round.problem;
         if (defeated) {
           const nation = board.NATIONS[c.targetId];
           const previous = new Set(frontier());
-          const previousTier = levelAt(c.peakHoldings);
-          const prior = c.rivals.find(r => r.owned.includes(nation.id));
-          if (prior) prior.owned = prior.owned.filter(id => id !== nation.id);
-          c.owned.push(nation.id);
+          const previousTier = levelAt(side.peakHoldings);
+          const prior = ownerMap()[nation.id] ?? null;
+          takeCountry(side,nation.id,prior);
           c.turn++;
-          c.peakHoldings = Math.max(c.peakHoldings, c.owned.length);
           const previousWinner = c.winner;
           advanceRivals(nation.id);
           delete c.garrisons[nation.id];
-          const tier = levelAt(c.peakHoldings);
-          capture = { id: nation.id, eraId:state.eraId, name: c.administration[nation.id]?.countryName || nation.name,
-            victory: c.owned.length === board.NATIONS.length, opened: frontier().filter(id => !previous.has(id)),
-            peakHoldings:c.peakHoldings, newTier:tier > previousTier ? tier + 1 : null, previousOwner:prior?.id ?? null,
+          const tier = levelAt(side.peakHoldings);
+          capture = { id: nation.id, eraId:state.eraId, empireId:c.activeEmpireId, name: side.administration[nation.id]?.countryName || nation.name,
+            victory: side.owned.length === board.NATIONS.length, opened: frontier().filter(id => !previous.has(id)),
+            peakHoldings:side.peakHoldings, newTier:tier > previousTier ? tier + 1 : null, previousOwner:prior,
             rivalMoves:c.rivalMoves.map(m => ({...m})), winner:previousWinner ? null : c.winner };
           if (decimal && enemy.kind === 'boss') region.bossCleared = true;
         } else c.garrisons[c.targetId].hp = afterHp;
@@ -994,6 +1085,7 @@
         nationId:round.nationId ?? null, world:round.world, mode:round.mode, lessonId:round.lessonId ?? null,
         difficulty:round.difficulty ?? null, campaignMath:round.campaignMath ?? (round.nationId != null ? 'classic' : null), independent, firstTry, hints, errors, fullyWorked, xp, coins, reviewCount:0});
       const record = run.history[run.history.length-1];
+      if (c.inBattle || round.empireId) record.empireId=c.activeEmpireId;
       Object.assign(record,{critical,baseDamage,damage,bonusXp:bonusDamage,elapsedMs,targetMs:timing.targetMs});
       if (round.receipt.paper) record.paper = round.receipt.paper;
       if (round.receipt.pair) record.pair = [...round.receipt.pair];
@@ -1046,7 +1138,7 @@
       get storageAvailable() { return available; },
       battleTiming, setBattleActive, checkpointBattle, view, startRound, finishRound, travel, setting, equip, campaignView, battleLessonFor, currentMathLesson, chooseCapital, invade, leaveCampaign, setScreen,
       switchEra, setCampaignMath, lessonView, startLesson, resumeLesson, automaticMath, reviewLessonProblem, saveReviewDraft, finishReview,
-      updateCountry, setEmpireName, addRival, removeRival,
+      updateCountry, setEmpireName, addRival, removeRival, setEmpireControl, switchEmpire,
       renameCountry(id, name) { return updateCountry(id, {countryName:name}); },
       setCountryCapital(id, changes) {
         if (!changes || typeof changes !== 'object' || Array.isArray(changes)) return false;

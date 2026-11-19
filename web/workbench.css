@@ -131,3 +131,11 @@
   .wb-leg-context { padding:8px 14px; }
   .wb-leg-context p { margin-left:0; flex-basis:100%; }
 }
+
+.wb-estimate-question{margin:12px 0 3px;color:#e9e1c8;font-weight:650}
+.wb-rounding-summary{max-width:34rem;margin:10px auto;color:#f4ecd8}
+.wb-rounding-summary dl{display:grid;gap:6px;margin:0;text-align:left}
+.wb-rounding-summary dl>div{padding:7px 11px;border-left:3px solid #82c9ab;background:#1a2c32;border-radius:3px}
+.wb-rounding-summary dt{font-size:.78rem;color:#bfcecb}
+.wb-rounding-summary dd{margin:2px 0 0;font-size:1rem;font-weight:700;font-variant-numeric:tabular-nums}
+.wb-rounding-summary p{font-size:.84rem}

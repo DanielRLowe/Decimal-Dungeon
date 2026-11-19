@@ -20,9 +20,10 @@
     ['decimal-subtract','Subtract decimals',5,'Align both decimals, then trade one unit for ten smaller units when needed.',
       ['For 5.2 − 1.47 write 5.20 above 1.47.','Trade one tenth for 10 hundredths. 10 − 7 = 3. In the tenths, trade one whole to get 11 − 4 = 7.','Now 4 − 1 = 3 ones. The difference is 3.73.']],
     ['decimal-three','Add three decimals in columns',6,'Add all three digits in a place and include the previous carry.',
-      ['Align 1.78, 2.86 and 0.59. Start at the hundredths.','8 + 6 + 9 = 23, so write 3 and carry 2. Add 7 + 8 + 5 + 2 = 22 in the tenths. Write 2 and carry 2.','Add 1 + 2 + 0 + 2 = 5 ones. The sum is 5.23.']],
+      ['Align 1.78, 2.86 and 0.59. Start at the hundredths.','8 + 6 + 9 = 23, so write 3 and carry 2. Add 7 + 8 + 5 + 2 = 22 in the tenths. Write 2 and carry 2.','Add 1 + 2 + 0 + 2 = 5 ones. The sum is 5.23.',
+       'For an estimate, round each addend first. That gives 2 + 3 + 1 = 6. If you round the exact sum of 5.23, you get 5. Rounding happens at a different step.']],
     ['decimal-pairs','Choose a pair and add in two stages',6,'Pick any two decimals and work both additions column by column.',
-      ['For 1.75 + 0.625 + 2.25, try 1.75 + 2.25 first. Add hundredths, 5 + 5 = 10. Write 0 and carry 1.','In the tenths, 7 + 2 + 1 = 10. Write 0 and carry 1. The ones give 1 + 2 + 1 = 4. Your subtotal is 4.00.','Align your subtotal with 0.625, writing 4.000. Add right to left to get 4.625. Round the three original addends for a check.']]
+      ['For 1.75 + 0.625 + 2.25, try 1.75 + 2.25 first. Add hundredths, 5 + 5 = 10. Write 0 and carry 1.','In the tenths, 7 + 2 + 1 = 10. Write 0 and carry 1. The ones give 1 + 2 + 1 = 4. Your subtotal is 4.00.','Align your subtotal with 0.625, writing 4.000. Add right to left to get 4.625. The three original addends round to 2, 1 and 2. Their sum estimates the answer as 5.']]
   ];
   function legacyProblem(id, world, level, index, random) {
     const options = {random, first:false, tier:[2,4,6][level-1]};

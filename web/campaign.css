@@ -258,3 +258,23 @@
 .cm-preview-holding { stroke:#344a48; stroke-width:2; }
 .cm-preview-seat { fill:#ffe191; stroke:#493d28; stroke-width:3.4; stroke-linejoin:round; }
 .cm-preview-target-ring { fill:none; stroke:#fff5d0; stroke-width:4.5; paint-order:stroke; filter:drop-shadow(0 0 2px #273c45); }
+
+.cm-playing { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; width:fit-content; max-width:100%; box-sizing:border-box; margin:0 0 .9rem; padding:.45rem .65rem; background:#283b44; border:1px solid #526b73; border-radius:8px; color:#e0eae6; font-weight:650; font-size:.9rem; }
+.cm-playing select { max-width:100%; min-width:8rem; padding:.3rem 1rem .3rem .45rem; border:1px solid #61777d; border-radius:5px; background:#1b2b36; color:#f8f1df; font:inherit; cursor:pointer; }
+.cm-border-options { margin:.8rem 0; }
+.cm-border-options h3 { color:#e8e8d2; font-size:.96rem; margin:0 0 .45rem; }
+.cm-border-options h4 { margin:.4rem 0 .25rem; color:#bbcdc8; font-size:.76rem; font-weight:600; }
+.cm-border-options div,.cm-empire-row-actions { display:flex; flex-wrap:wrap; gap:.4rem; align-items:center; }
+.cm-border-options button,.cm-assume-control { display:inline-flex; align-items:center; gap:.35rem; border:1px solid #62796e; border-radius:6px; background:#2c4542; color:#f0f0d9; padding:.38rem .55rem; font:inherit; font-size:.84rem; font-weight:650; cursor:pointer; }
+.cm-border-options button:hover,.cm-assume-control:hover { background:#3a5750; }
+.cm-border-options button svg,.cm-assume-control svg { width:1em; height:1em; flex:none; }
+.cm-border-options p { margin:0; color:#cbd4ce; font-size:.85rem; }
+.cm-assume-control { margin:.45rem 0; }
+.cm-empires-dialog .cm-control-choices { margin:.75rem 0 0; padding:0; border:0; display:flex; align-items:stretch; gap:.5rem; }
+.cm-control-choices legend { margin-bottom:.35rem; color:#d9e5e0; font-weight:650; font-size:.88rem; }
+.cm-empires-dialog .cm-control-choices label { display:flex; flex:1; align-items:flex-start; gap:.45rem; border:1px solid #4f6266; border-radius:7px; padding:.55rem; cursor:pointer; background:#23333d; }
+.cm-control-choices label:has(input:checked) { outline:1px solid #afc69f; }
+.cm-control-choices input[type=radio] { width:1rem; flex:none; margin:2px 0 0; padding:0; }
+.cm-control-choices small { display:block; font-weight:450; margin-top:.15rem; color:#c4d1d1; }
+.cm-empires-dialog .cm-controller-label { display:flex; align-items:center; gap:.35rem; font-size:.75rem; }
+.cm-controller-label select { padding:.25rem .35rem; }

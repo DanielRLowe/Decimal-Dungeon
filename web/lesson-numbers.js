@@ -1,9 +1,10 @@
 // Original practice aligned to the 2021 Tennessee fifth-grade mathematics standards.
 (function (root, factory) {
-  const catalogue = factory();
+  const math=typeof module==='object' && module.exports?require('./math.js'):root.DungeonMath;
+  const catalogue = factory(math);
   root.DungeonNumberLessons = catalogue;
   if (typeof module === 'object' && module.exports) module.exports = catalogue;
-})(globalThis, function () {
+})(globalThis, function (math) {
   'use strict';
   const OA = 'Expressions and patterns', NBT = 'Base ten and decimals', NF = 'Fractions';
   const lessons = [];
@@ -115,16 +116,14 @@
 
   lesson('place-value','What a digit is worth',NBT,['5.NBT.A.1'],
     'Moving a digit one place left makes its value ten times as large. One place right makes its value one tenth as large.',
-    ['In 4.44, the first 4 is 4 ones. The next 4 is 4 tenths, or 0.4.',
-     'The final 4 is 4 hundredths, or 0.04. Ten copies of 0.04 make 0.4.'],
+    ['In 2.66, cover everything except the first 6. It is in the tenths column. Six tenths of a whole is 0.6.',
+     'Now look only at the last 6. It counts hundredths. Write 0.06, with a zero holding the tenths place.',
+     'Count by six hundredths: 0.06, 0.12, 0.18 … 0.60. Ten small groups fill the larger one. One small group is 1/10 of it.'],
     (level,i,pick)=>{
-      const d=pick(2,9), left=level-1,right=level;
+      const d=pick(2,9), left=level-1;
       const text=left===0?d+'.'+d:pick(1,8)+'.'+(left===2?pick(1,8):'')+d+d;
-      return {prompt:'Compare the digit '+d+' in the '+places[left]+' and '+places[right]+' places of '+text+'.',steps:[
-        step('What is its value in the '+places[left]+' place?',dec(d,left),'Multiply the digit by the value of its column.'),
-        step('What is its value one column to the right?',dec(d,right),'Each column to the right is one tenth as large.'),
-        step('How many copies of the smaller value make the larger one?',10,'One place-value unit can be traded for ten of the next smaller unit.'),
-        fraction('What fraction of the larger value is the smaller value?','1/10','Write the part represented by one of those ten equal copies.')]};
+      const aid=typeof module!=='undefined' && module.exports ? require('./place-value.js') : globalThis.DungeonPlaceValue;
+      return aid.make(text,left);
     });
 
   lesson('powers-of-ten','Powers of ten',NBT,['5.NBT.A.2'],
@@ -179,17 +178,22 @@
     });
 
   lesson('decimal-round','Round on a number line',NBT,['5.NBT.A.4'],
-    'Use the two nearest marks for the requested place. A point below the midpoint rounds to the lower mark. At the midpoint or above it, round up.',
-    ['To round 3.746 to hundredths, locate 3.74 and 3.75. Their midpoint is 3.745.',
-     '3.746 lies just above the midpoint, so it rounds to 3.75.'],
+    'Find the two numbers your decimal sits between at the requested place. The closest one is the rounded answer. At an exact tie, choose the larger one.',
+    ['To round 1.77 to a whole number, mark 1 and 2. Their halfway point is 1.50.',
+     '1.77 is above 1.50. It is only 0.23 away from 2, so 1.77 rounds to 2. Exactly 1.50 also rounds to 2.',
+     'For hundredths, 3.746 is between 3.74 and 3.75. Its halfway mark is 3.745, so 3.746 rounds to 3.75.'],
     (level,i,pick)=>{
-      const d=level-1,low=pick(8,32)*10**d+pick(0,10**d-1),tail=i%4===0?5:pick(1,9),v=low*10+tail;
-      const lo=dec(low,d),hi=dec(low+1,d),num=dec(v,d+1),mid=dec(low*10+5,d+1);
-      return {prompt:'Round '+num+' to the nearest '+(d===0?'whole number':names[d])+'.',model:line(Number(lo),Number(hi),Number(num)),steps:[
-        step('What is the lower endpoint?',lo,'Read the mark just below the given number at the requested place.'),
-        step('What number is halfway between '+lo+' and '+hi+'?',mid,'The midpoint is five units of the next smaller place above the lower endpoint.'),
-        select('Where does '+num+' lie relative to the midpoint?',tail<5?'Below':tail===5?'At the midpoint':'Above',['Below','At the midpoint','Above'],'Compare the number and the midpoint in matching places.',i),
-        step('What is the rounded number?',tail<5?lo:hi,'Choose the nearer endpoint. At an exact tie, choose the higher endpoint.')]};
+      const d=level-1,starter=level===1 && i===0;
+      const low=starter?1:pick(1,32)*10**d+pick(0,10**d-1);
+      const extra=starter || (d<2 && i%3===1)?2:1,unit=10**extra;
+      const tail=starter?77:i%4===0?unit/2:pick(1,unit-1);
+      const lo=dec(low,d),hi=dec(low+1,d),num=dec(low*unit+tail,d+extra),mid=dec(low*10+5,d+1);
+      const place=d===0?'whole number':names[d];
+      return {prompt:'Round '+num+' to the nearest '+place+'.',model:line(Number(lo),Number(hi),Number(num)),steps:[
+        step('Read the number line. What number labels its left endpoint?',lo,'Find the mark on the far left. You will choose the nearest endpoint in the final step.'),
+        step('What number is halfway between '+lo+' and '+hi+'?',mid,'Start at the left endpoint and move halfway to the right endpoint.'),
+        select('Where does '+num+' lie relative to the halfway mark?',tail<unit/2?'Below':tail===unit/2?'At the midpoint':'Above',['Below','At the midpoint','Above'],'Compare the decimal with the halfway mark.',i),
+        step('Which endpoint is the rounded answer for '+num+'?',math.roundDecimal(num,d),'Choose the endpoint closest to the dot. If the dot is exactly halfway, choose the larger endpoint.')]};
     });
 
   lesson('whole-multiply','Multiply with partial products',NBT,['5.NBT.B.5'],
@@ -229,13 +233,14 @@
 
   lesson('decimal-multiply','Multiply decimals and estimate',NBT,['5.NBT.B.7'],
     'Name the unit of each factor. One tenth times one tenth makes one hundredth. Estimate first so you can check the size of the result.',
-    ['A strip is 2.4 meters long and 0.6 meter wide. Using 2.5 × 0.6 gives an estimate of 1.5 square meters.',
+    ['A strip is 2.4 meters long and 0.6 meter wide. Round its length to the nearest whole meter. Now 2 × 0.6 gives an estimate of 1.2 square meters.',
      '24 tenths × 6 tenths gives 144 hundredths because 24 × 6 = 144.',
      '144 hundredths is 1.44 square meters, close to the estimate.'],
     (level,i,pick)=>{
       const pa=level===3?2:1,pb=level===1?0:1, a=level===1?pick(12,69):level===2?pick(13,59):pick(112,698),b=level===1?pick(2,8):pick(3,9);
       const A=dec(a,pa),B=dec(b,pb),p=pa+pb,unit=places[p];
-      const approxUnit=level===3?1:0, rounded=Math.floor((a+5)/10),approx=dec(rounded,approxUnit),est=dec(rounded*b,approxUnit+pb,true);
+      const approxUnit=level===3?1:0,approx=math.roundDecimal(A,approxUnit);
+      const roundedUnits=Number(approx.replace('.','')),est=dec(roundedUnits*b,approxUnit+pb,true);
       return {prompt:'A banner measures '+A+' meters by '+B+' meters. Find its area in square meters.',
         steps:[step('Round '+A+' to the nearest '+(approxUnit?'tenth':'whole number')+'.',approx,'Use the next smaller place to choose the nearest value.'),
           step('Use that rounded length with the original width. Estimate the area.',est,'Multiply '+approx+' by '+B+' for this estimate.'),
@@ -251,7 +256,7 @@
     (level,i,pick)=>{
       if(level===1||i%2===0){
         const p=level===1?1:2,d=pick(2,level===3?15:8),q=pick(2,level*3+3)*10**p+pick(1,10**p-1);
-        const n=q*d,N=dec(n,p),approx=Math.round(q/10**p),compat=approx*d;
+        const n=q*d,N=dec(n,p),approx=Number(math.roundDecimal(dec(q,p))),compat=approx*d;
         return {prompt:'Divide '+N+' liters equally among '+d+' tanks. How many liters go in each?',
           steps:[step('Use '+compat+' liters as a nearby total. About how many liters would each tank get?',approx,'Divide the nearby whole-number total by '+d+'.'),
             step('Rename '+N+' liters in '+places[p]+'. How many '+places[p]+' is that?',n,'Multiply the number of liters by '+10**p+'.'),

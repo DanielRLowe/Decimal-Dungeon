@@ -42,6 +42,7 @@ if (pass === 1) {
     if (!$('[data-rival-name]')?.getClientRects().length) click('[data-empires]');
     set('[data-rival-name]', name);
     set('[data-rival-home]', country(code).id);
+    click('[data-new-control][value="ai"]');
     click('[data-add-rival]');
   }
   if ($('[data-empires-close]')?.getClientRects().length) click('[data-empires-close]');

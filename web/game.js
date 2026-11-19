@@ -45,7 +45,7 @@
   function scoreScene() {
     const {screen,campaign,round} = game.state;
     const invading = screen === 'battle' && campaign.inBattle && campaign.targetId != null
-      && !round?.receipt?.capture && !campaign.owned.includes(campaign.targetId);
+      && round?.nationId === campaign.targetId && !round.receipt?.capture;
     return invading ? 'battle' : 'atlas';
   }
   const music = DungeonMusic.create({enabled:!!game.state.settings.music,scene:scoreScene()});
@@ -111,7 +111,7 @@
     const encounterNumber = v.encounter - (receipt?.defeated ? 1 : 0);
     byId('scenery').style.backgroundImage = 'url("assets/' + landscapes[scenery] + '.webp")';
     const era=DungeonEras.get(campaign.eraId);
-    const geography=nation ? [nationName!==nation.name?nation.name:null,nation.region,era?.id!=='modern'?era?.date:null].filter(Boolean).join(' · ') : '';
+    const geography=nation ? [campaign.rivals.length?campaign.empireName:null,nationName!==nation.name?nation.name:null,nation.region,era?.id!=='modern'?era?.date:null].filter(Boolean).join(' · ') : '';
     setText('world-title',nation ? nationName : topic?.title || 'Math practice');
     setText('world-number',nation ? [flag(nation.iso2),'Country battle',geography].filter(Boolean).join(' · ') : 'Math practice');
     const encounterType = enemy.kind === 'boss' ? 'Boss' : enemy.kind === 'special' ? 'Elite' : 'Guardian';
@@ -255,6 +255,8 @@
       time.textContent='Solved in '+Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0')+' · 2× spell power · +'+receipt.bonusXp+' bonus XP';
       critical.append(title,time);resultEquation.before(critical);
     }
+    const rounding=MathWorkbench.estimateSummary(round.problem);
+    if(rounding)resultEquation.after(rounding);
     if (receipt.pair) showPairWork(round.problem, receipt.pair, resultEquation);
     const notes = [];
     const academicId=DungeonLessons.topicOf(round)?.id;
@@ -285,10 +287,10 @@
       if (capture.newTier) notes.push('Campaign tier ' + capture.newTier + ' reached! ' + campaign.progression.label + '.');
       for (const move of capture.rivalMoves || []) {
         const territory = campaign.nations[move.countryId].name;
-        notes.push(move.name + ' took ' + territory + (move.from === 'player' ? ' from your empire.' : '.'));
+        notes.push(move.name + ' took ' + territory + (move.from === campaign.activeEmpireId ? ' from your empire.' : '.'));
       }
       if (capture.winner) {
-        const victor = capture.winner === 'player' ? campaign.empireName : campaign.rivals.find(r => r.id === capture.winner)?.name;
+        const victor = campaign.empires.find(f => f.id === capture.winner)?.name;
         if (victor) notes.push(victor + ' won the empire race!');
       }
       const opened = (capture.opened || []).map(id => campaign.nations[id].name);
@@ -421,7 +423,7 @@
       onChange:updateHUD, onTravel:afterSelection || (() => showBattle()), onReset:() => showCampaign(true)
     });
   }
-  function showCampaign(focus = false) {
+  function showCampaign(focus = false, countryId) {
     stopTimer();
     const capturedId = game.state.round?.receipt?.capture?.id;
     if (capturedId != null) game.leaveCampaign();
@@ -431,7 +433,12 @@
     const host = byId('campaign-host');
     DungeonCampaignMap.render(host, game, {
       onEra(id) { if(game.switchEra(id)) showCampaign(true); },
-      onChooseCapital(id) { if (game.chooseCapital(id)) showCampaign(true); },
+      onChooseCapital(id) { if (game.chooseCapital(id)) showCampaign(true,id); },
+      onSwitchEmpire(id,country) {
+        if (!game.switchEmpire(id)) return false;
+        showCampaign(true,country);
+        return true;
+      },
       onInvade(id) { if (game.invade(id)) showBattle(); },
       onResume() {
         const {targetId, inBattle} = game.campaignView();
@@ -445,7 +452,7 @@
         });
       },
       onPractice:() => openPanel('map')
-    }, {capturedId});
+    }, {capturedId,countryId});
     updateHUD();
     if (focus) {
       window.scrollTo(0, 0);

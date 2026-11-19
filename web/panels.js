@@ -159,7 +159,7 @@
     function help() {
       body.append(el('h3', '', 'Grow your empire'), description('Pick a real country as your home. Choose a country across your border or along a marked game sea route, then challenge its fantasy guardian. When its health reaches zero, the country flies your flag and opens new routes for your empire.'),
         description('One correct answer captures a regular or elite guardian. Bosses take up to two. Press Return on the result to continue to the next problem, or choose See your empire to pick your own target.'),
-        description('Choose Manage empires on the campaign map to add computer rivals. Give each one a name and a home country. Each gets a turn when you capture a country.'),
+        description('Choose Manage empires to give another empire a name and a home country. You can play it yourself or let the computer move it. Use Playing as on the map to switch between the empires you control.'),
         el('h3', '', 'Choose your lesson'), description('Open Lessons to choose a topic and difficulty. Each tutorial includes a worked example. Use Sessions to continue a saved problem or practice one again.'),
         el('h3','','Work it out'),description('Choose Math paper to draw with a mouse or trackpad, or type your calculations. In fraction addition and subtraction, use the fraction workmat to round the amounts and build matching pieces.'),
         el('h3', '', 'Decimal addition and subtraction'), description('Line up the decimal points and work one column at a time.'));

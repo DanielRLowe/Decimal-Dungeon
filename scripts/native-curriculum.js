@@ -70,6 +70,17 @@ if(pass<3) {
       }
       const work=round.problem.steps.map((s,i)=>{
         assert($(host+' .lc-task h3')?.textContent===s.prompt,'The intermediate work question changed');
+        if(lesson.id==='place-value'){
+          const columns=[...document.querySelectorAll(host+' .pv-column')];
+          const chart=round.problem.model;
+          const expected=i<2?[chart.left+i]:[chart.left,chart.left+1];
+          assert(columns.length===chart.text.replace('.','').length &&
+            columns.every((cell,col)=>cell.classList.contains('pv-selected')===expected.includes(col)),
+            'The place-value chart must highlight the digit being discussed');
+          const shaded=document.querySelectorAll(host+' .pv-filled').length;
+          assert(shaded===(i<2?Number(chart.text.replace('.','')[chart.left+i]):1),
+            'The place-value picture must match the current question');
+        }
         if(s.choices)choices++;
         steps++;return nativeLesson.answer(host,s,i,true,formatted(s));
       });

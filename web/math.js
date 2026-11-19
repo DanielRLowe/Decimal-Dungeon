@@ -24,6 +24,16 @@
     return precision ? digits.slice(0, -precision) + '.' + digits.slice(-precision) : digits;
   }
 
+  // Inspect the first discarded digit once. This also handles a carry into
+  // the next whole number, without converting a decimal through a binary float.
+  function roundDecimal(value, places=0) {
+    const n=parts(value,true);
+    if(!n || !Number.isInteger(places) || places<0 || places>6)throw Error('Invalid decimal or rounding place');
+    const kept=Number(n.whole+n.fraction.slice(0,places).padEnd(places,'0'));
+    const next=n.fraction[places] || '0';
+    return scaledText(kept+(next>='5'?1:0),places);
+  }
+
   function operands(problem) {
     return problem.c == null ? [problem.a, problem.b] : [problem.a, problem.b, problem.c];
   }
@@ -69,9 +79,10 @@
       });
       incoming = outgoing;
     }
-    const roundedOperands = numbers.map(n => Number(n.whole) + Number(Number(n.fraction[0] || 0) >= 5));
+    const roundedOperands = operands(problem).map(value => Number(roundDecimal(value)));
     const estimate = combine(roundedOperands, problem.op);
-    return {rows, precision, wholeWidth, width, columns, blanks, total, answer, roundedOperands, estimate};
+    const roundedAnswer = Number(roundDecimal(answer));
+    return {rows, precision, wholeWidth, width, columns, blanks, total, answer, roundedOperands, estimate, roundedAnswer};
   }
 
   function sameDecimal(input, expected) {
@@ -237,5 +248,5 @@
       + (steps.answer ? 10 : 0) + (steps.estimate ? 5 : 0);
   }
 
-  return {makeProblem, operands, analyze, pairPlan, sameDecimal, checkColumn, checkZeros, spellDamage};
+  return {makeProblem, operands, analyze, pairPlan, roundDecimal, sameDecimal, checkColumn, checkZeros, spellDamage};
 });

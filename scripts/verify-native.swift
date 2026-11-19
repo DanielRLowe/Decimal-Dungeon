@@ -321,6 +321,9 @@ struct SmokeTest {
                     """)
                 try await captureMap(game, name: "lesson-library")
             }
+            if directory.lastPathComponent == "manual-empires" && pass == 1 {
+                try await captureMap(game, name: "brazil-manual-frontier")
+            }
             if directory.lastPathComponent == "campaign" && pass > 0 {
                 try await captureMap(game, name: ["", "captured-border", "renamed-capital", "reopened-border"][pass])
             }
@@ -385,6 +388,11 @@ struct SmokeTest {
                                          window: window, script: "native-battle-music.js", passes: 3)
                 try await verifyScenario(entry: entry, directory: directory.appendingPathComponent("country-profiles"),
                                          window: window, script: "native-country-profiles.js", passes: 2)
+                try await verifyScenario(entry: entry, directory: directory.appendingPathComponent("manual-empires"),
+                                         window: window, script: "native-manual-empires.js", passes: 2)
+            } else if CommandLine.arguments.count > 3 && CommandLine.arguments[3] == "manual-empires" {
+                try await verifyScenario(entry: entry, directory: directory.appendingPathComponent("manual-empires"),
+                                         window: window, script: "native-manual-empires.js", passes: 2)
             } else if CommandLine.arguments.count > 3 && CommandLine.arguments[3] == "profiles" {
                 try await verifyScenario(entry: entry, directory: directory.appendingPathComponent("country-profiles"),
                                          window: window, script: "native-country-profiles.js", passes: 2)

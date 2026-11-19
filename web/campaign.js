@@ -60,7 +60,7 @@
   }
   const playerGold='#e5bb64';
   function factions(view) {
-    return [{id:'player',name:view.empireName || 'Your empire',color:playerGold,owned:view.owned}, ...(view.rivals || [])];
+    return view.empires || [{id:'player',name:view.empireName || 'Your empire',color:playerGold,owned:view.owned,control:'manual'}, ...(view.rivals || [])];
   }
   function ownerOf(view,id) {
     return view.owners?.[id] || (view.owned.includes(id)?'player':'neutral');
@@ -73,7 +73,7 @@
   }
   function disputed(view,nation) {
     if (!view.rivals?.length || !view.frontier.includes(nation.id)) return false;
-    const rivalControls=id=>view.rivals.some(r=>r.id===ownerOf(view,id));
+    const rivalControls=id=>{const owner=ownerOf(view,id);return owner!=='neutral' && owner!==(view.activeEmpireId || 'player');};
     return rivalControls(nation.id) || nation.neighbors.some(rivalControls);
   }
   function swatch(color) {
@@ -105,35 +105,39 @@
     }).join('');
     return '<section class="cm-standings" data-empire-standings data-race-goal="'+view.raceGoal+'" data-race-winner="'+xml(view.winner || '')+'" aria-label="Empire standings"><header><div><h2>Empire standings</h2><p>'+xml(goal)+'</p></div><span data-rival-turn>Turn '+view.turn+'</span></header>'+
       '<ol class="cm-empire-scores">'+ranked.map(f=>'<li data-empire-id="'+xml(f.id)+'">'+swatch(f.color)+'<span>'+xml(f.name)+'</span><b aria-label="'+f.owned.length+' countries">'+f.owned.length+'</b></li>').join('')+'</ol>'+
-      '<div class="cm-rival-news" data-rival-activity>'+(reports?'<h3>Latest moves</h3><ul>'+reports+'</ul>':winner?'':'<p>Each rival can claim one neighboring country after you capture a country.</p>')+'</div></section>';
+      '<div class="cm-rival-news" data-rival-activity>'+(reports?'<h3>Latest moves</h3><ul>'+reports+'</ul>':winner?'':'<p>'+((view.rivals || []).some(r=>r.control!=='manual')?'Computer empires can claim a neighbor after each capture.':'Human empires move when you play as them.')+'</p>')+'</div></section>';
   }
-  function openEmpires(container,game,actions) {
+  function openEmpires(container,game,actions,selectedHome) {
     if (document.querySelector('dialog.cm-empires-dialog[open]')) return;
     const dialog=document.createElement('dialog');
     dialog.className='cm-empires-dialog';
     dialog.setAttribute('aria-labelledby','cm-empires-heading');
     document.body.append(dialog);
-    let removal=null;
-    const suggestions=['Rival Empire 1','Rival Empire 2','Rival Empire 3','Rival Empire 4'];
+    let removal=null, switched=false;
     function draw(message='',focus='') {
       const v=effectiveView(game), rivals=v.rivals || [];
-      const rivalRows=rivals.map(r=>{
-        const confirming=removal===r.id;
-        return '<li class="cm-rival-row" data-rival-id="'+xml(r.id)+'"><div>'+swatch(r.color)+'<span><strong>'+xml(r.name)+'</strong><small>'+xml(v.nations[r.homeId].name)+' · '+r.owned.length+' '+(r.owned.length===1?'country':'countries')+'</small></span></div>'+
-          (confirming?'<div class="cm-release"><p>Return its '+r.owned.length+' '+(r.owned.length===1?'country':'countries')+' to neutral control?</p><button type="button" data-keep-rival>Keep empire</button><button type="button" data-release-rival="'+xml(r.id)+'">Remove empire</button></div>':
-          '<button class="cm-remove-rival" type="button" data-remove-rival="'+xml(r.id)+'" aria-label="Remove '+xml(r.name)+'">Remove</button>')+'</li>';
+      const rows=v.factions.map(f=>{
+        const active=f.id===v.activeEmpireId;
+        const human=f.control==='manual';
+        const home=v.nations[f.homeId];
+        const label=human?'Human':'Computer';
+        const play=human && !active && f.owned.length ? '<button type="button" data-play-empire="'+xml(f.id)+'">Play as '+xml(f.name)+'</button>':'';
+        const edit=f.id!=='player' && !active;
+        const change=edit?'<label class="cm-controller-label">Control<select data-empire-control="'+xml(f.id)+'"><option value="manual"'+(human?' selected':'')+'>Human</option><option value="ai"'+(!human?' selected':'')+'>Computer</option></select></label>':'';
+        const remove=edit?'<button class="cm-remove-rival" type="button" data-remove-rival="'+xml(f.id)+'" aria-label="Remove '+xml(f.name)+'">Remove</button>':'';
+        const confirmation='<div class="cm-release"><p>Return the countries held by '+xml(f.name)+' to neutral control?</p><button type="button" data-keep-rival>Keep empire</button><button type="button" data-release-rival="'+xml(f.id)+'">Remove empire</button></div>';
+        return '<li class="cm-rival-row" data-rival-id="'+xml(f.id)+'"><div>'+swatch(f.color)+'<span><strong>'+xml(f.name)+'</strong><small>'+[active?'Playing now':label,home?.name || '',f.owned.length+' '+(f.owned.length===1?'country':'countries')].filter(Boolean).map(xml).join(' · ')+'</small></span></div>'+
+          (removal===f.id?confirmation:'<div class="cm-empire-row-actions">'+play+change+remove+'</div>')+'</li>';
       }).join('');
-      const available=v.nations.filter(n=>ownerOf(v,n.id)==='neutral' && n.id!==v.targetId && !rivals.some(r=>r.homeId===n.id)).sort((a,b)=>a.name.localeCompare(b.name));
-      const suggestion=suggestions.find(n=>!v.factions.some(f=>f.name.toLowerCase()===n.toLowerCase())) || '';
-      const nearby=v.frontier?.find(id=>available.some(n=>n.id===id));
-      const preferred=nearby ?? available[0]?.id;
+      const available=v.nations.filter(n=>ownerOf(v,n.id)==='neutral' && n.id!==v.targetId && !v.factions.some(f=>f.homeId===n.id)).sort((a,b)=>a.name.localeCompare(b.name));
+      const preferred=available.find(n=>n.id===selectedHome) || available.find(n=>v.frontier.includes(n.id)) || available[0];
       const canAdd=!v.needsCapital && rivals.length<3 && available.length>0 && !v.winner && !v.victory;
-      const add=canAdd?'<form data-rival-form class="cm-create-rival"><h3>Create a rival</h3><div class="cm-rival-fields"><label>Empire name<input type="text" data-rival-name required maxlength="32" value="'+xml(suggestion)+'"></label><label>Starting country<select data-rival-home>'+available.map(n=>'<option value="'+n.id+'"'+(n.id===preferred?' selected':'')+'>'+xml(geographyName(n))+'</option>').join('')+'</select></label></div><button type="submit" data-add-rival>Add rival empire</button></form>':
-        '<p class="cm-rival-limit">'+(v.needsCapital?'Choose your home country on the map to add computer rivals.':rivals.length>=3?'All three rival slots are filled.':v.winner||v.victory?'This race has finished.':'Every country already belongs to an empire.')+'</p>';
+      const add=canAdd?'<form data-rival-form class="cm-create-rival"><h3>Create an empire</h3><div class="cm-rival-fields"><label>Empire name<input type="text" data-rival-name required maxlength="32" data-suggested="'+xml(preferred.name)+'" value="'+xml(preferred.name)+'"></label><label>Starting country<select data-rival-home>'+available.map(n=>'<option value="'+n.id+'"'+(n.id===preferred.id?' selected':'')+'>'+xml(geographyName(n))+'</option>').join('')+'</select></label></div>'+
+        '<fieldset class="cm-control-choices"><legend>Who controls this empire?</legend><label><input type="radio" name="empire-controller" data-new-control value="manual" checked><span><strong>Human</strong><small>You choose where to attack.</small></span></label><label><input type="radio" name="empire-controller" data-new-control value="ai"><span><strong>Computer</strong><small>Moves automatically after a capture.</small></span></label></fieldset>'+
+        '<button type="submit" data-add-rival>Create and play</button></form>':'<p class="cm-rival-limit">'+(v.needsCapital?'Choose your first home country on the map.':rivals.length>=3?'All four empire slots are filled.':v.winner||v.victory?'This race has finished.':'Every country already belongs to an empire.')+'</p>';
       dialog.innerHTML='<div class="cm-empire-dialog-inner"><header><div><span class="cm-modal-banner">'+icon('banner')+'</span><h2 id="cm-empires-heading">Manage empires</h2></div><button type="button" data-empires-close aria-label="Close empire settings">×</button></header>'+
-        '<form class="cm-player-name" data-player-form><label>Your empire name<input type="text" data-player-empire-name required maxlength="32" value="'+xml(v.empireName || 'Your empire')+'"></label><button type="submit" data-save-player-empire>Save name</button></form>'+
-        '<section aria-label="Computer empires"><h3>Computer rivals</h3><p class="cm-rival-intro">Add up to three. Each rival starts in its own country and takes a turn after each of your captures.</p>'+
-        (rivalRows?'<ul class="cm-rival-list">'+rivalRows+'</ul>':'')+'</section>'+add+
+        add+'<section><h3>Empires on this map</h3><ul class="cm-rival-list">'+rows+'</ul></section>'+
+        '<form class="cm-player-name" data-player-form><label>Current empire name<input type="text" data-player-empire-name required maxlength="32" value="'+xml(v.empireName || 'Your empire')+'"></label><button type="submit" data-save-player-empire>Save name</button></form>'+
         '<p class="cm-empire-feedback" data-empires-message role="status" aria-live="polite">'+xml(message)+'</p></div>';
       if(focus) dialog.querySelector(focus)?.focus({preventScroll:true});
     }
@@ -145,30 +149,53 @@
       const note=dialog.querySelector('[data-empires-message]');
       note.textContent=text;note.classList.add('is-error');
     }
+    function play(id,countryId) {
+      if(!actions.onSwitchEmpire?.(id,countryId)) return report('This empire cannot take a turn.');
+      switched=true;dialog.close();
+    }
+    dialog.addEventListener('change',e=>{
+      if(e.target.matches('[data-rival-home]')) {
+        const field=dialog.querySelector('[data-rival-name]');
+        const name=game.campaignView().nations[Number(e.target.value)].name;
+        if(!field.value.trim() || field.value===field.dataset.suggested) field.value=name;
+        field.dataset.suggested=name;
+      }
+      if(e.target.matches('[data-new-control]')) dialog.querySelector('[data-add-rival]').textContent=e.target.value==='manual'?'Create and play':'Create computer empire';
+      if(e.target.matches('[data-empire-control]')) {
+        const id=e.target.dataset.empireControl;
+        if(game.setEmpireControl(id,e.target.value)) sync('Control updated.','[data-empire-control="'+id+'"]');
+      }
+    });
     dialog.addEventListener('submit',e=>{
       e.preventDefault();
       if(e.target.matches('[data-player-form]')) {
         const name=dialog.querySelector('[data-player-empire-name]').value;
         if(!game.setEmpireName(name)) return report('Choose a distinct empire name of 1–32 characters.');
-        return sync('Your empire name is saved.','[data-player-empire-name]');
+        return sync('Empire name saved.','[data-player-empire-name]');
       }
       if(e.target.matches('[data-rival-form]')) {
         const name=dialog.querySelector('[data-rival-name]').value;
         const home=Number(dialog.querySelector('[data-rival-home]').value);
-        if(!game.addRival(name,home)) return report('Choose a distinct name of 1–32 characters and an unclaimed starting country.');
-        sync(name.trim()+' joined the campaign.','[data-empires-close]');
+        const control=dialog.querySelector('[data-new-control]:checked').value;
+        if(!game.addRival(name,home,control)) return report('Choose a distinct name of 1–32 characters and an available starting country.');
+        if(control==='manual') return play(game.campaignView().rivals.find(r=>r.homeId===home).id,home);
+        sync(name.trim()+' joined as a computer empire.','[data-empires-close]');
       }
     });
     dialog.addEventListener('click',e=>{
       const button=e.target.closest('button');
       if(!button)return;
       if(button.hasAttribute('data-empires-close')) {dialog.close();return;}
+      if(button.hasAttribute('data-play-empire')) {play(button.dataset.playEmpire);return;}
       if(button.hasAttribute('data-remove-rival')) {removal=button.dataset.removeRival;draw('','[data-keep-rival]');return;}
       if(button.hasAttribute('data-keep-rival')) {removal=null;draw('','[data-remove-rival]');return;}
-      if(button.hasAttribute('data-release-rival') && game.removeRival(button.dataset.releaseRival)) sync('Rival removed. Its countries are neutral.','[data-empires-close]');
+      if(button.hasAttribute('data-release-rival') && game.removeRival(button.dataset.releaseRival)) sync('Empire removed. Its countries are neutral.','[data-empires-close]');
     });
-    dialog.addEventListener('close',()=>{dialog.remove();container.querySelector('[data-empires]')?.focus({preventScroll:true});},{once:true});
-    draw();dialog.showModal();dialog.querySelector('[data-empires-close]').focus({preventScroll:true});
+    dialog.addEventListener('close',()=>{
+      dialog.remove();container.querySelector(switched?'[data-active-empire]':'[data-empires]')?.focus({preventScroll:true});
+    },{once:true});
+    draw();dialog.showModal();
+    dialog.querySelector(selectedHome==null?'[data-empires-close]':'[data-rival-name]')?.focus({preventScroll:true});
   }
   function status(v,id){return v.needsCapital?'available':v.owned.includes(id)?'owned':v.frontier.includes(id)?'frontier':'locked';}
   function statusText(v,n){
@@ -192,7 +219,7 @@
       const faction=ownerStyle(v,n.id),contested=disputed(v,n);
       const fill=countryFill(v,n,faction);
       const description=geographyName(n)+' · '+statusText(v,n)+(faction?' · '+faction.name:'')+(contested?' · Disputed frontier':'');
-      return '<g class="cm-country cm-'+s+(faction&&faction.id!=='player'?' cm-rival-country':'')+'" role="button" tabindex="-1" data-iso3="'+xml(n.code)+'" data-status="'+s+'" data-owner="'+xml(faction?.id || 'neutral')+'" data-contested="'+contested+'" data-territory-id="'+n.id+'" aria-pressed="false" aria-label="'+xml(description)+'"><title>'+xml(description)+'</title><path class="cm-ground" d="'+xml(n.path||'')+'" fill="'+xml(fill)+'" vector-effect="non-scaling-stroke"/></g>';
+      return '<g class="cm-country cm-'+s+(faction&&faction.id!==(v.activeEmpireId || 'player')?' cm-rival-country':'')+'" role="button" tabindex="-1" data-iso3="'+xml(n.code)+'" data-status="'+s+'" data-owner="'+xml(faction?.id || 'neutral')+'" data-contested="'+contested+'" data-territory-id="'+n.id+'" aria-pressed="false" aria-label="'+xml(description)+'"><title>'+xml(description)+'</title><path class="cm-ground" d="'+xml(n.path||'')+'" fill="'+xml(fill)+'" vector-effect="non-scaling-stroke"/></g>';
     }).join('');
     const oceans=oceanNames.map(([lon,lat,t])=>'<text x="'+round(xof(lon))+'" y="'+round(yof(lat))+'">'+t+'</text>').join('');
     return '<svg class="cm-map" tabindex="-1" viewBox="0 0 '+width+' '+height+'" role="group" aria-label="Real-world political map. Arrow keys select nearby countries. Enter opens country actions.">'+
@@ -265,7 +292,7 @@
     const adjacent = n.neighbors || [];
     const border=adjacent.filter(id=>v.owned.includes(id));
     const open=adjacent.filter(id=>!v.owned.includes(id)&&!v.frontier.includes(id));
-    const route=adjacent.filter(id=>v.frontier.includes(id))[0] ?? initial(v);
+    const neighbors=adjacent.filter(id=>v.frontier.includes(id)).map(id=>v.nations[id]).sort((a,b)=>a.name.localeCompare(b.name));
     const rank={normal:'Guard',special:'Elite guard',boss:'Boss guard'}[defender?.kind||n.rank] || 'Guard';
     const summary=v.needsCapital?'Start here to claim your first country.':v.victory?'You now control every playable country.':owned?
       (n.id===v.seatId?'Your empire is governed from '+n.capital+'.':home?'This is where your campaign began.':'This country now belongs to your empire.'):s==='locked'?
@@ -273,7 +300,7 @@
     const button=v.needsCapital?'<button type="button" class="cm-primary" data-home="'+n.id+'">'+icon('banner')+'Start in '+xml(n.name)+'</button>':
       s==='frontier'?'<button type="button" class="cm-primary" '+(v.targetId===n.id?'data-resume':'data-invade="'+n.id+'"')+'>'+icon('sword')+(v.targetId===n.id?'Resume battle':'Fight for '+xml(n.name))+'</button>':
       v.victory?'<button type="button" class="cm-primary" data-practice>'+icon('book')+'Choose a lesson</button>':
-      '<button type="button" class="cm-secondary" data-select-id="'+route+'">'+icon('compass')+'Inspect '+xml(v.nations[route].name)+'</button>';
+      '';
     const lists=(title,ids)=>ids.length?'<div class="cm-geo-links"><span>'+title+'</span><p>'+ids.map(id=>countryButton(v.nations[id])).join('<span class="cm-comma">, </span>')+'</p></div>':'';
     const entering=s==='frontier'?lists('Reachable from',border):'';
     const newFrontiers=s==='frontier'?'<div class="cm-routes"><span>New frontiers after victory</span><p>'+(open.length?open.map(id=>countryButton(v.nations[id])).join('<span class="cm-comma">, </span>'):'No new frontiers. Victory secures this part of your border.')+'</p></div>':'';
@@ -283,6 +310,24 @@
     const flag=guide.flagMarkup(v.era,n);
     const faction=ownerStyle(v,n.id);
     const owner=v.needsCapital?'':'<div class="cm-country-owner" data-country-owner="'+xml(faction?.id || 'neutral')+'">'+swatch(faction?.color || '#a6b5a6')+'<span>'+xml(faction?.name || 'Independent country')+'</span>'+(disputed(v,n)?'<b>Disputed frontier</b>':'')+'</div>';
+    const activeId=v.activeEmpireId || 'player';
+    const switchControl=faction && faction.id!==activeId && faction.owned.length ?
+      '<button type="button" class="cm-assume-control" data-play-country="'+xml(faction.id)+'">'+
+      icon('banner')+xml((faction.control==='manual'?'Play as ':'Take control of ')+faction.name)+'</button>':'';
+    const canFound=!v.needsCapital && !faction && n.id!==v.targetId && !v.factions.some(f=>f.homeId===n.id) && v.rivals.length<3 && !v.winner && !v.victory;
+    const found=canFound?'<button type="button" class="cm-assume-control" data-found-at="'+n.id+'">'+icon('banner')+'Found an empire in '+xml(n.name)+'</button>':'';
+    let attacks='';
+    if(owned && !v.victory) {
+      const groups=[['Land borders',[]],['Sea crossings',[]],['Overland expeditions',[]]];
+      for(const next of neighbors) {
+        const group=water.includes(next.id)?1:n.expeditionNeighbors?.includes(next.id)?2:0;
+        groups[group][1].push('<button type="button" data-attack-neighbor="'+next.id+'">'+icon('sword')+xml(next.name)+'</button>');
+      }
+      const routes=groups.filter(([,buttons])=>buttons.length).map(([label,buttons])=>
+        '<h4>'+label+'</h4><div>'+buttons.join('')+'</div>').join('');
+      attacks='<section class="cm-border-options" data-border-options><h3>Attack from '+xml(n.name)+'</h3>'+
+        (routes||'<p>This country has no open frontier.</p>')+'</section>';
+    }
     const admin=v.administration?.[n.id];
     const capitalLine=n.capital?'<div class="cm-capital-info"><span>Capital</span><strong data-capital-name-display>'+xml(n.capital)+'</strong>'+
       (!v.needsCapital&&v.seatId===n.id?'<span class="cm-seat-badge">★ Empire seat</span>':'')+
@@ -295,9 +340,9 @@
     return '<div class="cm-detail-body"><span class="cm-status is-'+s+'">'+icon(owned?'banner':s==='frontier'?'sword':v.needsCapital?'compass':'lock')+statusText(v,n)+'</span>'+
       '<div class="cm-country-heading">'+flag+'<h2>'+xml(n.name)+'</h2></div>'+
       (geography?'<p class="cm-geography">'+geography+'</p>':'')+
-      owner+capitalLine+originalCapital+geographyNote+
+      owner+switchControl+attacks+capitalLine+originalCapital+geographyNote+
       '<button class="cm-profile-open" type="button" data-action="country-profile" aria-haspopup="dialog">'+icon('book')+'<span><strong>Country profile</strong><small>'+xml(guide.preview(v.era,n))+'</small></span><span class="cm-profile-arrow" aria-hidden="true">→</span></button>'+
-      holdingsList+manage+
+      holdingsList+manage+found+
       '<div class="cm-battle-scene" style="background-image:url(assets/'+scenes[n.biome]+'.webp)"><span>Battlefield preview</span><strong>'+xml(sceneDescriptions[n.biome])+'</strong></div>'+
       guard+battleMath(v,!owned&&!v.needsCapital?defender:null,n.id)+'<p class="cm-callout">'+xml(summary)+'</p>'+button+entering+newFrontiers+
       lists('Game sea crossings',water)+lists('Overland expeditions',n.expeditionNeighbors||[])+(v.needsCapital?'<div class="cm-routes"><span>Starting position</span><p>'+adjacent.length+' reachable '+(adjacent.length===1?'country':'countries')+' from this home.</p></div>':'')+'</div>';
@@ -305,23 +350,29 @@
   function render(container,game,actions={},options={}) {
     const previous=sessions.get(container), v=effectiveView(game);
     previous?.abort.abort();
-    const prior=previous?.view.era.id===v.era.id?previous:null;
+    const sameEra=previous?.view.era.id===v.era.id;
+    const switched=sameEra && previous.view.activeEmpireId!==v.activeEmpireId;
+    const prior=sameEra && !switched?previous:null;
     let capture=options.capturedId;
     if(!Number.isInteger(capture)||!v.owned.includes(capture)) capture=null;
     const justChose=prior?.view.needsCapital && !v.needsCapital;
-    const selected=capture??(!justChose && prior?.game===game && v.nations[prior.selected]?prior.selected:initial(v));
+    const requested=Number.isInteger(options.countryId) && v.nations[options.countryId]?options.countryId:null;
+    const switchSite=v.frontier.includes(v.targetId)?v.targetId:v.owned.includes(v.seatId)?v.seatId:v.owned[0];
+    const selected=capture??requested??(switched?(switchSite??v.capitalId):justChose?v.capitalId:prior?.game===game?prior.selected:initial(v));
     const active=container.contains(document.activeElement)?document.activeElement:null;
     const oldFocus=active?.hasAttribute('data-territory-id')?'country':active?.hasAttribute('data-pick')?'pick':active?.matches('[data-home],[data-invade],[data-resume]')?'fight':null;
     const state={game,view:v,selected,zoom:prior?.zoom||1,cx:prior?.cx??width/2,cy:prior?.cy??height/2,abort:new AbortController()};
     sessions.set(container,state);
     const capital=v.nations[v.capitalId], customName=v.empireName && v.empireName!=='Your empire';
     const prefix=customName?v.empireName:(v.needsCapital?'World conquest':capital.name+' campaign');
+    const playing=v.factions.length>1?'<label class="cm-playing">'+swatch(v.activeEmpire?.color || playerGold)+'<span>Playing as</span><select data-active-empire aria-label="Playing as">'+v.factions.filter(f=>f.control==='manual' && (f.owned.length || f.id===v.activeEmpireId)).map(f=>
+      '<option value="'+xml(f.id)+'"'+(f.id===v.activeEmpireId?' selected':'')+'>'+xml(f.name)+'</option>').join('')+'</select></label>':'';
     const winner=v.factions.find(f=>f.id===v.winner);
     const title=v.victory?'World conquered':winner?'Empire race complete':'Campaign map';
-    const summary=v.needsCapital?'Choose your home country. Add rival empires to race for control of the map.':
+    const summary=v.needsCapital?'Choose the home country of your first empire.':
       winner?winner.name+' won the empire race. You can keep exploring the world.':
       capture!==null?v.nations[capture].name+' now belongs to your empire. Choose your next frontier.':
-      v.victory?'Every playable country is yours.':v.rivals?.length?'Race to hold '+v.raceGoal+' countries. Rivals move after each capture.':'Choose a bordering country or follow a sea crossing. Win its battle to expand your empire.';
+      v.victory?'Every playable country is yours.':v.rivals?.length?'Race to hold '+v.raceGoal+' countries. Select one of your holdings to see where it can attack.':'Choose a bordering country or follow a sea crossing. Win its battle to expand your empire.';
     const eraOptions=root.DungeonEras.list.map(era=>'<option value="'+xml(era.id)+'"'+(era.id===v.era.id?' selected':'')+'>'+xml(era.title)+'</option>').join('');
     const credit=v.era.id==='modern'?'':'<details class="cm-era-credits"><summary>Historical map notes and credits</summary><p>'+xml(v.era.notes || '')+'</p><p>Border and capital data from CShapes 2.0 by Guy Schvitz, Seraina Rüegger, Luc Girardin, Lars-Erik Cederman, Nils Weidmann and Kristian Skrede Gleditsch (ETH Zürich). The dated boundaries were grouped and simplified for play. Game sea crossings connect the map. Adapted historical atlas licensed under Creative Commons Attribution–NonCommercial–ShareAlike 4.0 International.</p></details>';
     const mode=v.mathMode || 'curriculum';
@@ -330,16 +381,20 @@
       '<option value="curriculum"'+(mode==='curriculum'?' selected':'')+'>Grade 5 mastery path</option><option value="classic"'+(mode==='classic'?' selected':'')+'>Classic decimal campaign</option></select></div>'+
       '<button type="button" data-campaign-lesson>Choose a lesson</button><button type="button" data-campaign-progress>'+v.learning.mastered+' / '+v.learning.total+' lessons mastered</button></section>';
     const eraPicker='<section class="cm-era"><label for="campaign-era">Campaign era</label><select id="campaign-era" data-campaign-era>'+eraOptions+'</select><p>'+xml(v.era.description)+'</p>'+credit+'</section>';
-    container.innerHTML='<div class="cm-shell"><header class="cm-heading"><div><div class="cm-empire-name">'+icon('banner')+xml(prefix)+'</div><h1>'+title+'</h1><p>'+xml(summary)+'</p></div><div class="cm-heading-tools"><button class="cm-setup-empires" type="button" data-empires>'+icon('banner')+'Manage empires</button><div class="cm-score" aria-label="'+v.claimed+' of '+v.total+' countries"><span>'+icon('keep')+'</span><div><strong>'+v.claimed+' <small>/ '+v.total+'</small></strong><b>Countries held</b></div></div></div></header>'+eraPicker+mathSelect+
+    container.innerHTML='<div class="cm-shell"><header class="cm-heading"><div><div class="cm-empire-name">'+icon('banner')+xml(prefix)+'</div><h1>'+title+'</h1><p>'+xml(summary)+'</p></div><div class="cm-heading-tools"><button class="cm-setup-empires" type="button" data-empires>'+icon('banner')+'Manage empires</button><div class="cm-score" aria-label="'+v.claimed+' of '+v.total+' countries"><span>'+icon('keep')+'</span><div><strong>'+v.claimed+' <small>/ '+v.total+'</small></strong><b>Countries held</b></div></div></div></header>'+playing+eraPicker+mathSelect+
       '<div class="cm-layout"><div class="cm-map-column"><section class="cm-atlas" aria-label="World campaign map"><div class="cm-atlas-tools"><div class="cm-search-wrap">'+icon('compass')+'<input type="search" data-search autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-controls="cm-results" aria-expanded="false" aria-label="Find a country" placeholder="Find a country"><ul id="cm-results" role="listbox" hidden></ul></div><button class="cm-world-view" data-fit type="button">'+icon('map')+'World view</button></div><div class="cm-viewport">'+projectedWorld(v)+'</div>'+
       '<div class="cm-map-notice" data-map-notice hidden><span data-map-message></span><button type="button" data-stop-placing>Keep current site</button></div>'+
-      '<div class="cm-mapbar"><div class="cm-key"><span><i class="cm-key-held"></i>Your empire</span><span><i class="cm-key-front"></i>Open frontier</span>'+((v.rivals || []).length?'<span><i class="cm-key-disputed"></i>Disputed frontier</span>':'')+'<span><i class="cm-key-sea"></i>Sea crossing</span>'+(!v.needsCapital?'<span><b class="cm-seat-key">★</b>Empire seat</span>':'')+'</div><div class="cm-zoom"><button data-zoom="-1" aria-label="Zoom out" type="button">−</button><output>100%</output><button data-zoom="1" aria-label="Zoom in" type="button">+</button></div></div></section>'+standings(v)+'</div>'+
+      '<div class="cm-mapbar"><div class="cm-key"><span><i class="cm-key-held" style="background-color:'+xml(v.activeEmpire?.color || playerGold)+'"></i>Your empire</span><span><i class="cm-key-front"></i>Open frontier</span>'+((v.rivals || []).length?'<span><i class="cm-key-disputed"></i>Disputed frontier</span>':'')+'<span><i class="cm-key-sea"></i>Sea crossing</span>'+(!v.needsCapital?'<span><b class="cm-seat-key">★</b>Empire seat</span>':'')+'</div><div class="cm-zoom"><button data-zoom="-1" aria-label="Zoom out" type="button">−</button><output>100%</output><button data-zoom="1" aria-label="Zoom in" type="button">+</button></div></div></section>'+standings(v)+'</div>'+
       '<aside class="cm-dossier"><div class="cm-picker"><label for="cm-country-pick">Inspect country</label><div class="cm-select-wrap"><select data-pick id="cm-country-pick">'+[...v.nations].sort((a,b)=>a.name.localeCompare(b.name)).map(n=>'<option value="'+n.id+'">'+xml(geographyName(n))+'</option>').join('')+'</select>'+icon('chevron')+'</div></div><div class="cm-detail"></div></aside></div>'+
       '<div class="cm-bottom"><span>'+icon('compass')+'<span>'+(v.needsCapital?v.total+' playable countries':v.frontier.length+' open '+(v.frontier.length===1?'frontier':'frontiers'))+'</span></span><button type="button" data-practice>'+icon('book')+'Choose a lesson</button></div><p class="cm-sr" aria-live="polite" data-announcement></p></div>';
     const svg=container.querySelector('.cm-map'),picker=container.querySelector('[data-pick]'),panel=container.querySelector('.cm-detail');
     const labels=svg.querySelector('[data-map-labels]'),routes=svg.querySelector('[data-routes]'),search=container.querySelector('[data-search]'),list=container.querySelector('#cm-results');
     const countries=[...svg.querySelectorAll('[data-territory-id]')];
     const opts={signal:state.abort.signal};
+    container.querySelector('[data-active-empire]')?.addEventListener('change',e=>{
+      actions.onSwitchEmpire?.(e.target.value);
+      container.querySelector('[data-active-empire]')?.focus({preventScroll:true});
+    },opts);
     container.querySelector('[data-campaign-era]').addEventListener('change', e=>{
       actions.onEra?.(e.target.value);
       container.querySelector('[data-campaign-era]')?.focus({preventScroll:true});
@@ -601,6 +656,20 @@
       if(dragged&&svg.contains(e.target)){dragged=false;return;}
       if (editor?.placing && svg.contains(e.target)) {placeOnMap(e);return;}
       if (e.target.closest('[data-empires]')) {openEmpires(container,game,actions);return;}
+      const found=e.target.closest('[data-found-at]');
+      if(found){openEmpires(container,game,actions,Number(found.dataset.foundAt));return;}
+      const take=e.target.closest('[data-play-country]');
+      if(take){
+        const faction=v.factions.find(f=>f.id===take.dataset.playCountry);
+        if(faction && (faction.control==='manual' || game.setEmpireControl(faction.id,'manual'))) actions.onSwitchEmpire?.(faction.id,state.selected);
+        return;
+      }
+      const attack=e.target.closest('[data-attack-neighbor]');
+      if(attack){
+        const target=Number(attack.dataset.attackNeighbor);
+        if(v.targetId===target)actions.onResume?.();else actions.onInvade?.(target);
+        return;
+      }
       const profileButton=e.target.closest('[data-action="country-profile"]');
       if(profileButton){root.DungeonCountryGuide.open(v.era,v.nations[state.selected],profileButton);return;}
       if (e.target.closest('[data-manage]')) {openEditor();return;}
@@ -657,7 +726,7 @@
     const observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>{if(!state.abort.signal.aborted)queueCamera();}):null;
     observer?.observe(svg);state.abort.signal.addEventListener('abort',()=>{observer?.disconnect();if(raf)cancelAnimationFrame(raf);},{once:true});
     select(selected,oldFocus==='country');
-    if(capture!==null||justChose)center(v.nations[selected],true);
+    if(capture!==null||justChose||switched||requested!==null)center(v.nations[selected],true);
     if(oldFocus==='pick')picker.focus({preventScroll:true});
     if(oldFocus==='fight')panel.querySelector('.cm-primary,.cm-secondary')?.focus({preventScroll:true});
     if(capture!==null||v.victory)announce(summary);

@@ -6,6 +6,34 @@
   const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const clone = value => JSON.parse(JSON.stringify(value));
 
+  function estimateSummary(problem) {
+    if (!problem || problem.op!=='+' || problem.c==null) return null;
+    const plan=root.DungeonMath.analyze(problem);
+    const summary=document.createElement('section');
+    summary.className='wb-rounding-summary';summary.dataset.estimateSummary='';
+    summary.setAttribute('aria-label','Check the two ways to round');
+    const rows=[
+      ['Round each addend, then add',plan.roundedOperands.join(' + ')+' = '+plan.estimate,'roundedAddends'],
+      ['Add first, then round the exact total',plan.answer+' rounds to '+plan.roundedAnswer,'roundedTotal']
+    ];
+    const list=document.createElement('dl');
+    for(const [label,equation,key] of rows){
+      const row=document.createElement('div'),term=document.createElement('dt'),value=document.createElement('dd');
+      term.textContent=label;value.textContent=equation;value.dataset[key]='';
+      row.append(term,value);list.append(row);
+    }
+    summary.append(list);
+    if(plan.estimate!==plan.roundedAnswer){
+      const note=document.createElement('p');
+      const scale=10**plan.precision;
+      const gap=Math.abs(plan.estimate*scale-plan.total)/scale;
+      note.textContent='Rounding each starting number still gets you close. Your estimate of '+plan.estimate+
+        ' is '+gap+' away from the exact sum of '+plan.answer+'.';
+      summary.append(note);
+    }
+    return summary;
+  }
+
   function mount(container, options) {
     const math = root.DungeonMath;
     const p = options.problem;
@@ -44,6 +72,7 @@
     if(grouped) Object.assign(fresh,{pairWorkVersion:1,pair:[],activePair:[],pairLeg:0,resumeStage:null,subtotal:'',firstWork:null});
     const saved=options.draft?.signature===signature ? options.draft : null;
     const state=saved?{...fresh,...clone(saved),steps:{...fresh.steps,...saved.steps}}:fresh;
+    state.rounded=originalNumbers.map((_,i)=>String(state.rounded?.[i]??'').slice(0,16));
     if(saved&&!Array.isArray(saved.shifts)) state.shifts[1]=state.shift;
     if(grouped && saved && (saved.pairWorkVersion!==1 || (saved.stage!=='pair'&&!validPair(saved.activePair)))) {
       // Previous group spells recorded a typed subtotal, but no checked column work on either addition.
@@ -139,7 +168,7 @@
         case 'align': return 'Line up the decimals';
         case 'zeros': return 'Fill the empty places';
         case 'columns': return (subtract ? 'Subtract' : 'Add') + ' the ' + column().place;
-        case 'estimate': return 'Check with an estimate';
+        case 'estimate': return threeAddends?'Round each addend, then add':'Check with an estimate';
         default: return 'Read your answer';
       }
     }
@@ -274,13 +303,20 @@
           return advance('estimate');
         case 'estimate': {
           if (threeAddends) {
-            const missing=state.rounded.findIndex(value=>value==='');
+            const missing=state.rounded.findIndex(value=>!value.trim());
             if (missing!==-1) {state.message='Round '+originalNumbers[missing]+' to the nearest whole number first.';save();return draw('rounded'+missing);}
-            const wrong=state.rounded.findIndex((value,i)=>Number(value)!==originalPlan.roundedOperands[i]);
+            const wrong=state.rounded.findIndex((value,i)=>!math.sameDecimal(value,originalPlan.roundedOperands[i]));
             if (wrong!==-1) return notifyError('estimate','Check the tenths digit of '+originalNumbers[wrong]+'. A digit of 5 or more rounds up.','rounded'+wrong);
           }
           if (state.guess === null) { state.message = 'Choose your estimate first.'; save(); return draw('estimate'); }
-          if (state.guess !== originalPlan.estimate) return notifyError('estimate',threeAddends ? 'Your rounded addends are correct. Add those three whole numbers and choose their total.' : 'Round each number separately first. A tenths digit of 5 or more rounds the whole number up.','estimate');
+          if (state.guess !== originalPlan.estimate) {
+            const triedRoundedTotal=threeAddends && state.guess===originalPlan.roundedAnswer;
+            const message=triedRoundedTotal ? originalPlan.answer+' does round to '+originalPlan.roundedAnswer+
+              '. Here you rounded each addend first. What is '+originalPlan.roundedOperands.join(' + ')+'?' :
+              threeAddends ? 'Your rounded addends are correct. Add those three whole numbers and choose their total.' :
+                'Round each number separately first. A tenths digit of 5 or more rounds the whole number up.';
+            return notifyError('estimate',message,'estimate');
+          }
           return finish();
         }
       }
@@ -369,11 +405,12 @@
       const n = originalPlan.estimate;
       const candidates = [Math.max(0,n-2), Math.max(0,n-1),n,n+1,n+2];
       const lower = Number(p.a.replace('.','').slice(-1)) % 3;
-      const set = [...new Set([n, ...[candidates[lower], candidates[lower+1], n+2, n+1,n+3]])].slice(0,3).sort((a,b)=>a-b);
+      const choices = threeAddends ? [n, originalPlan.roundedAnswer] : [n];
+      const set = [...new Set([...choices,candidates[lower],candidates[lower+1],n+2,n+1,n+3])].slice(0,3).sort((a,b)=>a-b);
       const rounding = threeAddends ? '<div class="wb-rounding">'+originalNumbers.map((value,i)=>
-        '<label>'+escape(value)+'<input data-field="rounded'+i+'" aria-label="Round '+escape(value)+' to the nearest whole number" value="'+escape(state.rounded[i])+'" inputmode="numeric" maxlength="9" autocomplete="off" placeholder="?"></label>'
+        '<label>'+escape(value)+'<input data-field="rounded'+i+'" aria-label="Round '+escape(value)+' to the nearest whole number" value="'+escape(state.rounded[i])+'" inputmode="numeric" maxlength="16" autocomplete="off" placeholder="?"></label>'
       ).join('<span aria-hidden="true">+</span>')+'</div>' : '';
-      return rounding+'<div class="wb-estimates" role="group" aria-label="Choose an estimate">'+set.map(v=>'<button type="button" aria-pressed="'+(state.guess===v)+'" data-guess="'+v+'">'+v+'</button>').join('')+'</div>';
+      return rounding+(threeAddends?'<p class="wb-estimate-question">What is the sum of your three whole numbers?</p>':'')+'<div class="wb-estimates" role="group" aria-label="Choose an estimate">'+set.map(v=>'<button type="button" aria-pressed="'+(state.guess===v)+'" data-guess="'+v+'">'+v+'</button>').join('')+'</div>';
     }
     function draw(focusName) {
       if (closed) return;
@@ -457,7 +494,7 @@
       const name = e.target.dataset.field;
       if (!name) return;
       const wholeField=name.startsWith('rounded');
-      const value = name === 'final' || name==='subtotal' ? e.target.value : wholeField ? e.target.value.replace(/[^0-9]/g,'').slice(0,9) : e.target.value.replace(/[^0-9]/g,'').slice(-1);
+      const value = name === 'final' || name==='subtotal' ? e.target.value : wholeField ? e.target.value.slice(0,16) : e.target.value.replace(/[^0-9]/g,'').slice(-1);
       e.target.value = value;
       if (name.startsWith('z')) state.zeros[name.slice(1)] = value;
       else if (wholeField) state.rounded[Number(name.slice(7))]=value;
@@ -478,7 +515,7 @@
           if (unfilled && e.target.value) { container.querySelector('[data-field="z'+unfilled.row+'-'+unfilled.index+'"]').focus(); return; }
         }
         if (e.target.dataset.field.startsWith('rounded') && e.target.value) {
-          const empty=state.rounded.findIndex(value=>value==='');
+          const empty=state.rounded.findIndex(value=>!value.trim());
           if (empty!==-1) {container.querySelector('[data-field="rounded'+empty+'"]').focus();return;}
           if (state.guess===null) {container.querySelector('[data-guess]').focus();return;}
         }
@@ -503,5 +540,5 @@
     draw();
     return {getDraft:()=>clone(state), destroy:()=>{paper?.finishStroke();closed=true;detach();}};
   }
-  root.MathWorkbench = {mount};
+  root.MathWorkbench = {mount,estimateSummary};
 })(globalThis);

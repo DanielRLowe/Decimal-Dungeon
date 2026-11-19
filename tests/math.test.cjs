@@ -667,3 +667,67 @@ test('reopening the game after a worked pair preserves one award and one mastery
   assert.equal(game.state.coins, coins);
   assert.equal(game.state.stats.count, 1);
 });
+
+test('rounding keeps the named place, uses the first discarded digit, and rounds exact ties up', () => {
+  for (const [source,places,result] of [
+    ['1.77',0,'2'],['1.00',0,'1'],['1.499999',0,'1'],['1.500000',0,'2'],
+    ['.500000',0,'1'],['.499999',0,'0'],['1.049999',1,'1.0'],['1.050000',1,'1.1'],
+    ['1.005',2,'1.01'],['1.004999',2,'1.00'],['9.995',2,'10.00'],['.007',3,'0.007'],
+    ['00001.245',1,'1.2'],['100000000.555555',4,'100000000.5556']
+  ]) assert.equal(math.roundDecimal(source,places),result,source+' to '+places+' places');
+});
+
+test('a child can correctly round 1.77 to 2 while estimating its three addends as 1', () => {
+  const p={world:6,op:'+',a:'0.48',b:'0.49',c:'0.80'},plan=math.analyze(p);
+  const ui=session(p);
+  alignRows(ui);
+  writeColumns(ui,plan.columns);
+  ui.input('final','1.77');ui.button('check');
+  stage(ui,'estimate');
+  assert.match(ui.html,/Round each addend, then add/);
+  ui.input('rounded0','0');ui.input('rounded1','0');ui.input('rounded2','0.80');
+  ui.button(null,2);ui.button('check');
+  assert.equal(ui.saved.rounded[2],'0.80'); // Preserve what was typed, including its point.
+  assert.match(ui.saved.message,/tenths digit of 0.80/);
+  ui.input('rounded2','1.0');
+  ui.button('check');
+  assert.match(ui.saved.message,/1.77 does round to 2/);
+  assert.match(ui.saved.message,/0 \+ 0 \+ 1/);
+  assert.equal(ui.completed,0);
+  assert.match(ui.html,/data-guess="1"/);
+  assert.match(ui.html,/data-guess="2"/);
+  const resumed=reopen(ui,p);
+  resumed.button(null,1);resumed.button('check');
+  assert.equal(resumed.result.answer,'1.77');
+  assert.equal(resumed.completed,1);
+  assert.deepEqual([plan.estimate,plan.roundedAnswer],[1,2]);
+  const opposite=math.analyze({a:'0.51',b:'0.51',c:'0.51',op:'+'});
+  assert.deepEqual([opposite.estimate,opposite.roundedAnswer],[3,2]);
+});
+
+test('a saved three-number receipt and its old history snapshot reproduce both rounding methods', () => {
+  const A=require('../web/adventure'), store=new Map();
+  const storage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,v)};
+  let game=A.open(storage);
+  game.travel(A.SCHOOLWORK);
+  const r=game.startRound(()=>({a:'0.48',b:'0.49',c:'0.80',op:'+',world:6}));
+  const result={answer:'1.77',damage:35,fullyWorked:true,hints:0,errors:{},independent:true};
+  game.finishRound(r.id,result);
+  game=A.open(storage);
+  const saved=game.state.round;
+  assert.equal(saved.id,r.id);assert.equal(saved.receipt.answer,'1.77');
+  const entry=game.reviewLessonProblem(saved.lessonSessionId,saved.id);
+  const oldDocument=global.document;
+  global.document={createElement:()=>({children:[],dataset:{},setAttribute(){},append(...nodes){this.children.push(...nodes);}})};
+  try {
+    for(const p of [saved.problem,entry.problem]){
+      const summary=MathWorkbench.estimateSummary(p);
+      const rows=summary.children[0].children;
+      assert.deepEqual(rows.map(r=>r.children[1].textContent),['0 + 0 + 1 = 1','1.77 rounds to 2']);
+      assert.match(summary.children[1].textContent,/estimate of 1 is 0\.77 away from the exact sum of 1\.77/);
+    }
+  } finally {
+    if(oldDocument===undefined) delete global.document;
+    else global.document=oldDocument;
+  }
+});

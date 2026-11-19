@@ -362,7 +362,7 @@
         details.append(el('span','ll-card-note','Problem '+(i+1)+(lesson ? ' · '+lesson.title : '')+' · '+location(entry)),
           el('h4','',problemText(entry.problem)),line('Answer '+entry.answer+' · '+(entry.independent ? 'Independent' : 'With support')));
         if (entry.reviewCount) details.append(el('span','ll-completed',count(entry.reviewCount,'review')+' completed'));
-        if (entry.work?.length || entry.pair) details.append(workRecord(entry));
+        if (entry.work?.length || entry.pair || entry.problem.c!=null) details.append(workRecord(entry));
         const paper=root.DungeonPaper.review(entry.paper);
         if(paper)details.append(paper);
         const replay = action(entry.hasReviewDraft ? 'Continue review' : 'Practice again',() => { review(id,entry.roundId); focusPage(); });
@@ -383,13 +383,15 @@
           const li = el('li');
           li.append(el('span','',step.prompt),el('strong','',step.answer)); steps.append(li);
         });
-      } else {
+      } else if(entry.pair) {
         const values = root.DungeonMath.operands(entry.problem);
         const result = root.DungeonMath.pairPlan(entry.problem,entry.pair);
         steps.append(el('li','',values[entry.pair[0]]+' + '+values[entry.pair[1]]+' = '+result.subtotal),
           el('li','',result.subtotal+' + '+result.remaining+' = '+result.answer));
       }
-      details.append(steps);
+      if(steps.children.length)details.append(steps);
+      const rounding=root.MathWorkbench.estimateSummary(entry.problem);
+      if(rounding)details.append(rounding);
       return details;
     }
     function review(id, roundId, fromTracker) {
@@ -409,6 +411,8 @@
           const done = el('section','ll-intro'); done.dataset.reviewComplete = '';
           done.append(el('span','ll-label','Session '+id),el('h3','',lessons.topicOf(entry)?.title || 'Problem complete'),line(problemText(entry.problem)),
               el('p','ll-answer','Answer '+(result.answer ?? entry.answer)));
+          const rounding=root.MathWorkbench.estimateSummary(entry.problem);
+          if(rounding)done.append(rounding);
           const backToSession = action(fromTracker?'Back to progress':'Back to session',() => { if (fromTracker) fromTracker(); else session(id); focusPage(); },'ll-primary');
           body.append(done,backToSession); focusPage();
         }});

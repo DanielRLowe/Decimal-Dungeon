@@ -87,18 +87,34 @@
   function model(m,ctx={}) {
     if (!m) return null;
     const fig=el('figure');fig.className='lc-model';
-    if(m.type==='coordinates') grid(fig,m,ctx);
+    if(m.type==='place-value') root.DungeonPlaceValue.view(fig,m,ctx.verified?.length||0);
+    else if(m.type==='coordinates') grid(fig,m,ctx);
     else if(m.type==='prism'||m.type==='composite') prism(fig,m);
     else if(m.type==='table') {
       const t=el('table'),head=el('thead'),hr=el('tr');for(const cell of m.headers){const th=el('th',cell);th.scope='col';hr.append(th);}head.append(hr);t.append(head);
       const body=el('tbody');for(const row of m.rows){const tr=el('tr');for(const cell of row)tr.append(el('td',cell));body.append(tr);}t.append(body);fig.append(t);if(m.caption)fig.append(el('figcaption',m.caption));
     } else if(m.type==='numberline') {
-      const s=svgFigure(fig,320,99,'Number line from '+m.min+' to '+m.max);
-      const start=28,end=292,mid=(m.min+m.max)/2;
-      line(s,start,48,end,48,'#acc7bc',{'stroke-width':2});
-      for(const [x,n] of [[start,m.min],[(start+end)/2,Number(mid.toFixed(7))],[end,m.max]]){line(s,x,40,x,55);label(s,x,74,n);}
+      const stage=ctx.verified?.length ?? 3, start=46,end=274,center=(start+end)/2;
+      const midpoint=Number(((m.min+m.max)/2).toFixed(7));
+      const s=svgFigure(fig,320,105,'Number line. Left endpoint '+m.min+', right endpoint '+m.max+
+        ', dot at '+m.value+(stage>1?', halfway mark '+midpoint:'')+'.');
+      s.dataset.roundingLine='';
+      line(s,start,44,end,44,'#acc7bc',{'stroke-width':2});
+      for(let i=1;i<10;i++){
+        const x=start+(end-start)*i/10;
+        if(i!==5)line(s,x,41,x,48,'#677c8b');
+      }
+      for(const [x,n,role] of [[start,m.min,'Left endpoint'],[center,midpoint,'Halfway'],[end,m.max,'Right endpoint']]){
+        line(s,x,35,x,52,role==='Halfway'?'#bda17a':'#aacabb',{'stroke-width':2});
+        label(s,x,70,role==='Halfway'&&stage<2?'?':n,{'font-size':15,'font-weight':700});
+        label(s,x,88,role,{'font-size':11,fill:'#c3d1da'});
+      }
       const x=start+(end-start)*(m.value-m.min)/(m.max-m.min);
-      v(s,'circle',{cx:x,cy:48,r:5,fill:'#ffcf7b'});label(s,Math.max(25,Math.min(295,x)),28,m.value,{fill:'#ffda91'});
+      v(s,'circle',{cx:x,cy:44,r:5,fill:'#ffcf7b'});label(s,x,23,m.value,{fill:'#ffda91','font-weight':700});
+      const captions=['Start with the left endpoint. You will choose the nearest endpoint in the final step.',
+        'Find the halfway mark between the two endpoints.','Compare the gold dot with the halfway mark.',
+        'Choose the nearest endpoint. At the halfway mark, choose the larger endpoint.'];
+      fig.append(el('figcaption',captions[Math.min(3,stage)]));
     } else if(m.type==='bars') {
       for(const b of (m.bars||[m])) {
         const total=Math.max(1,Math.ceil(b.numerator/b.denominator)), div=el('div');div.className='lc-bars';

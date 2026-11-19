@@ -194,7 +194,7 @@ test('claim is atomic and explicit, expanding the frontier without awarding a se
   game.invade(target);
   const won = win(game);
   const { xp, coins, serial } = game.state;
-  assert.deepEqual(won.capture, { id: target, eraId:'modern', name: 'Mexico', victory: false, opened: [country('BLZ').id, country('GTM').id],
+  assert.deepEqual(won.capture, { id: target, eraId:'modern', empireId:'player', name: 'Mexico', victory: false, opened: [country('BLZ').id, country('GTM').id],
     peakHoldings:2, newTier:2, previousOwner:null, rivalMoves:[], winner:null });
   assert.equal(game.campaignView().defenders[target].hp, 0);
   assert.ok(game.campaignView().frontier.includes(beyond));

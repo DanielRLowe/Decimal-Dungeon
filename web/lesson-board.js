@@ -46,7 +46,9 @@
     node.type='button'; node.addEventListener('click',fn); return node;
   }
   function mount(host,{problem,draft,onDraft,onComplete}) {
-    const steps=problem.steps, identity=JSON.stringify([problem.lessonId,problem.prompt,steps.map(s=>s.answer)]);
+    const identity=JSON.stringify([problem.lessonId,problem.prompt,problem.steps.map(s=>s.answer)]);
+    problem=root.DungeonPlaceValue.fromSaved(problem);
+    const steps=problem.steps;
     const fractionModel=root.DungeonFractionWorkmat.readProblem(problem);
     const saved=draft?.identity===identity?draft:{};
     let verified=[];
@@ -121,7 +123,12 @@
       function check() {
         if(closed || !shell.isConnected) return;
         if(!value.trim()){message='Enter or choose an answer for this step.';return announce();}
-        if(!matches(step,value)){errors++;message='Try this step again. Use the hint if you need a starting point.';persist();announce();field?.select();return;}
+        if(!matches(step,value)){errors++;message=problem.model?.type==='place-value' && index<2 ?
+          'Look at just the highlighted digit. '+(index+problem.model.left===0?'Count the whole units.':'It represents part of one whole, so start with 0 and a decimal point.') : 'Try this step again. Use the hint if you need a starting point.';
+          if(problem.lessonId==='decimal-round' && index===0 && matches(steps[steps.length-1],value)){
+            message='You found the nearest endpoint. First record the number at the left end of the line. You will give the rounded answer in the final step.';
+          }
+          persist();announce();field?.select();return;}
         verified.push(value.trim());value='';numeratorFromMat=null;message='';hinted=false;
         if(verified.length===steps.length) {
           paper.finishStroke();closed=true;
