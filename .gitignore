@@ -1,0 +1,5 @@
+.DS_Store
+*.app/
+*.exe
+Decimal Dungeon.zip
+__pycache__/

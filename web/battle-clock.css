@@ -1,0 +1,21 @@
+.bt-clock {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .45rem;
+  width: fit-content;
+  max-width: 100%;
+  padding: .34rem .7rem .34rem .4rem;
+  margin: 0 0 .55rem;
+  border: 1px solid #45546b;
+  border-radius: .65rem;
+  background: #182635;
+  color: #e8eff2;
+  font-size: .82rem;
+  line-height: 1.2;
+}
+.bt-dial { display: grid; place-items: center; width: 1.75rem; height: 1.75rem; color: #ffcf77; }
+.bt-title { font-weight: 650; }
+.bt-reading { min-width: 2.45em; font-weight: 800; font-variant-numeric: tabular-nums; }
+.bt-goal { padding-left: .65rem; border-left: 1px solid #516279; color: #ffda91; font-weight: 650; }
+.bt-clock[data-pace="paused"] .bt-goal, .bt-clock[data-pace="untimed"] .bt-goal { color: #b9c9d5; }

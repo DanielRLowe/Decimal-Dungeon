@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10131e">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' file:; style-src 'self' file: 'unsafe-inline'; img-src 'self' file: data:; media-src 'self' file:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+<title>Decimal Dungeon</title>
+<link rel="icon" href="assets/app-icon.png">
+<link rel="stylesheet" href="game.css">
+<link rel="stylesheet" href="workbench.css">
+<link rel="stylesheet" href="panels.css">
+<link rel="stylesheet" href="campaign.css">
+<link rel="stylesheet" href="country-guide.css">
+<link rel="stylesheet" href="lesson-board.css">
+<link rel="stylesheet" href="lesson-library.css">
+<link rel="stylesheet" href="math-paper.css">
+<link rel="stylesheet" href="fraction-workmat.css">
+<link rel="stylesheet" href="battle-clock.css">
+<script defer src="math.js"></script>
+<script defer src="campaign-data.js"></script>
+<script defer src="capitals.js"></script>
+<script defer src="historical-atlas.js"></script>
+<script defer src="eras.js"></script>
+<script defer src="lesson-numbers.js"></script>
+<script defer src="lesson-space.js"></script>
+<script defer src="lessons.js"></script>
+<script defer src="adventure.js"></script>
+<script defer src="math-paper.js"></script>
+<script defer src="fraction-workmat.js"></script>
+<script defer src="workbench.js"></script>
+<script defer src="lesson-models.js"></script>
+<script defer src="lesson-board.js"></script>
+<script defer src="lesson-library.js"></script>
+<script defer src="panels.js"></script>
+<script defer src="country-profiles.js"></script>
+<script defer src="historical-country-facts.js"></script>
+<script defer src="heritage-sites.js"></script>
+<script defer src="country-guide.js"></script>
+<script defer src="campaign.js"></script>
+<script defer src="victory.js"></script>
+<script defer src="battle-clock.js"></script>
+<script defer src="music.js"></script>
+<script defer src="game.js"></script>
+</head>
+<body>
+<a class="skip" href="#campaign-host">Go to campaign map</a>
+<header class="mast">
+  <div class="mast-inner">
+    <div class="brand" aria-label="Decimal Dungeon"><span data-icon="sword" class="brand-icon"></span><img src="assets/wordmark.png" alt="Decimal Dungeon"></div>
+    <nav class="nav" aria-label="Game navigation">
+      <button type="button" class="nav-item current" id="campaign-nav" aria-current="page"><span data-icon="flag"></span>Campaign</button>
+      <button type="button" class="nav-item" id="battle-nav"><span data-icon="battle"></span><span id="battle-nav-label">Practice</span></button>
+      <button type="button" class="nav-item" data-panel="map"><span data-icon="map"></span>Lessons</button>
+      <button type="button" class="nav-item" data-panel="sessions"><span data-icon="scroll"></span>Sessions</button>
+      <button type="button" class="nav-item" data-panel="progress"><span data-icon="spark"></span>Progress</button>
+      <button type="button" class="nav-item" data-panel="inventory"><span data-icon="bag"></span>Inventory</button>
+    </nav>
+    <div class="tools">
+      <button type="button" class="tool music-toggle" id="music" aria-label="Turn background music on" aria-pressed="false"><span data-icon="music"></span><span>Music</span></button>
+      <button type="button" class="tool" id="sound" title="Turn sound off" aria-label="Turn sound off"><span data-icon="sound"></span></button>
+      <button type="button" class="tool" data-panel="settings" title="Game settings" aria-label="Game settings"><span data-icon="gear"></span></button>
+    </div>
+  </div>
+</header>
+<main id="campaign-host" tabindex="-1" aria-label="Empire campaign"></main>
+<main class="game-layout" id="battle-host" hidden>
+  <div class="play-column">
+    <section class="lesson-strip" aria-label="Current lesson">
+      <div><small id="lesson-session-label">Current lesson</small><strong id="lesson-title" data-active-lesson></strong></div>
+      <button type="button" data-panel="tutorial">Tutorial</button>
+      <button type="button" data-panel="map">Change lesson</button>
+    </section>
+    <section class="arena" aria-labelledby="world-title">
+      <div class="scenery" id="scenery">
+        <div class="glints" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="area-title">
+          <div class="world-tag"><span data-icon="diamond"></span><span id="world-number">Math practice</span></div>
+          <h1 id="world-title" tabindex="-1">Add tenths</h1>
+        </div>
+        <div id="encounter" class="encounter">Encounter 01</div>
+        <div class="fighter hero-fighter" id="hero-fighter" aria-hidden="true">
+          <div class="char-shadow"></div>
+          <div class="figure"><img id="hero-art" src="assets/ranger.png" alt=""><span class="held" id="held"></span></div>
+        </div>
+        <div class="fighter enemy-fighter" id="enemy-fighter" aria-hidden="true">
+          <div class="char-shadow"></div>
+          <div class="figure"><img id="enemy-art" src="assets/slime.png" alt=""><span class="crown" data-icon="crown"></span></div>
+        </div>
+        <dialog id="victory-film" aria-labelledby="victory-caption">
+          <video id="victory-video" muted playsinline preload="none" aria-label="Heroes and monsters march into battle. The heroes raise their flag in victory."></video>
+          <strong id="victory-caption"></strong>
+          <button type="button" id="skip-victory">Skip film</button>
+        </dialog>
+        <div class="battle-flash" aria-hidden="true"></div>
+        <span class="crit-flare" aria-hidden="true">Critical hit!</span>
+        <div class="hero-nameplate plate"><span class="player-gem"></span><span id="battle-hero-name">Rowan</span></div>
+        <div class="enemy-nameplate plate">
+          <span class="hp-line"><b id="enemy-name">Moss Slime</b><span id="enemy-hp">30/30 HP</span></span>
+          <span class="meter hp-track"><span id="hp-meter"></span></span>
+        </div>
+      </div>
+      <div class="objective"><span data-icon="battle"></span><span id="objective">Solve the problem to defeat Moss Slime.</span></div>
+    </section>
+    <div class="spell-area">
+      <div id="battle-timer"></div>
+      <section id="workbench" tabindex="-1" aria-label="Math workbench"></section>
+    </div>
+  </div>
+  <aside class="journal" aria-label="Hero and progress">
+    <section class="journal-card hero-card">
+      <div class="card-title"><span class="kicker-icon" data-icon="helmet"></span><h2>Your hero</h2><button type="button" class="icon-link" title="Change hero or equipment" aria-label="Change hero or equipment" data-panel="inventory"><span data-icon="edit"></span></button></div>
+      <div class="hero-profile">
+        <div class="portrait"><img id="portrait" src="assets/ranger.png" alt=""></div>
+        <div><div class="small-label" id="hero-role">Forest ranger</div><strong id="hero-name">Rowan</strong><span class="level-badge" id="hero-level">Level 1</span></div>
+      </div>
+      <div class="xp-label"><span>Experience</span><span id="xp-count">0 / 100 XP</span></div>
+      <div class="meter xp-track"><span id="xp-meter"></span></div>
+      <div class="wallet"><span data-icon="coin"></span><strong id="coins">0</strong><span>gold coins</span></div>
+    </section>
+    <section class="journal-card quest-card">
+      <div class="card-title"><span class="kicker-icon" data-icon="scroll"></span><h2>Battle and learning progress</h2></div>
+      <div class="quest-body">
+        <div class="quest-name"><span data-icon="flag"></span><strong id="quest-boss-title">Next boss</strong></div>
+        <p id="quest-boss-text"></p><div class="encounter-route" id="route" aria-hidden="true"></div>
+        <hr>
+        <div class="quest-name"><span data-icon="spark"></span><strong id="quest-mastery-title">Add tenths</strong></div>
+        <p id="quest-mastery-text"></p><div class="mastery-pips" id="mastery-pips" aria-hidden="true"></div>
+      </div>
+    </section>
+    <button class="map-preview" type="button" id="empire-preview">
+      <span class="map-image" id="campaign-miniature" aria-hidden="true"></span>
+      <span class="map-caption"><span data-icon="flag"></span><span class="map-caption-heading"><strong>Campaign map</strong><small id="preview-era"></small></span><span id="world-count"></span></span>
+    </button>
+  </aside>
+</main>
+<footer class="footer"><span class="save-status" id="save-status"><span data-icon="save"></span>Saved on this Mac</span><div><button type="button" data-panel="help"><span data-icon="help"></span>How to play</button><button type="button" data-panel="parent"><span data-icon="lock"></span>Parent progress report</button></div></footer>
+<noscript>This game needs JavaScript enabled.</noscript>
+</body>
+</html>

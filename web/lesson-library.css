@@ -1,0 +1,107 @@
+.dp-dialog.ll-dialog {
+  width:min(55rem,calc(100vw - 2.4rem));
+  max-height:min(88dvh,56rem);
+  scrollbar-gutter:stable;
+}
+.ll-dialog .dp-body {gap:1.05rem}
+.ll-dialog .ll-current,.ll-dialog .ll-intro {
+  border:1px solid #516970;
+  border-left:4px solid #7bd6b5;
+  border-radius:8px;
+  background:#20363e;
+  padding:.9rem 1.1rem;
+}
+.ll-current {display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.7rem 1.1rem}
+.ll-current>div {flex:1 1 18rem}
+.ll-intro,.ll-current>div,.ll-card,.ll-run>div:first-child,.ll-entry>div {display:grid; gap:.24rem}
+.ll-dialog .dp-body .ll-current h3,.ll-dialog .dp-body .ll-intro h3 {font:700 1.36rem/1.23 Georgia,serif; margin:0}
+.ll-dialog .ll-label {font-size:.69rem; font-weight:750; color:#9be2c9; letter-spacing:.11em; text-transform:uppercase}
+.ll-dialog .ll-copy {font-size:.9rem; line-height:1.46; color:var(--dp-dim); margin:0; overflow-wrap:anywhere}
+.ll-dialog .ll-controls {display:flex; align-items:end; flex-wrap:wrap; gap:.65rem 1.3rem}
+.ll-dialog .ll-levels {display:flex; min-width:0; border:0; padding:0; margin:0; gap:0}
+.ll-dialog .ll-levels legend,.ll-dialog .ll-field>span {
+  font-size:.77rem; font-weight:660; color:#ced9dc; margin:0 0 .3rem; padding:0
+}
+.ll-level {position:relative; display:inline-flex}
+.ll-level input,.ll-sr {
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+  clip:rect(0,0,0,0); white-space:nowrap; border:0
+}
+.ll-level span {
+  display:block; padding:.5rem .63rem; background:#152131; border:1px solid #495c73;
+  font-size:.85rem; line-height:1.3; color:var(--dp-dim); cursor:pointer
+}
+.ll-level+.ll-level span {border-left:0}
+.ll-level:first-of-type span {border-radius:6px 0 0 6px}
+.ll-level:last-of-type span {border-radius:0 6px 6px 0}
+.ll-level input:checked+span {background:#304c4d; color:#b9f5da; box-shadow:inset 0 -2px #83d6af}
+.ll-level input:focus-visible+span {outline:3px solid var(--dp-gold); outline-offset:2px; position:relative; z-index:1}
+.ll-dialog .ll-filter {display:flex; flex:1; flex-wrap:wrap; gap:.65rem}
+.ll-dialog .ll-field {display:grid; align-content:end; flex:1 1 9rem; min-width:0}
+.ll-field:first-child {flex-grow:1.12}
+.ll-dialog .ll-input {font:inherit; font-size:.85rem; color:var(--dp-text); width:100%; height:2.14rem; padding:0 .58rem; background:#152131; border:1px solid #495c73; border-radius:6px}
+.ll-dialog .ll-input::placeholder {color:#aab6c2; opacity:1}
+.ll-dialog .ll-results,.ll-dialog .ll-domain,.ll-dialog .ll-history,.ll-dialog .ll-runs {display:grid; gap:.65rem; min-width:0}
+.ll-dialog .ll-results {gap:1.35rem}
+.ll-dialog .dp-body .ll-domain-title {display:flex; align-items:center; gap:.78rem; font-size:1.14rem; margin:0 0 .08rem}
+.ll-domain-title::after {content:''; flex:1; height:1px; background:#42536a}
+.ll-cards {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65rem}
+.ll-card,.ll-run,.ll-entry {min-width:0; background:var(--dp-card); border:1px solid var(--dp-line); border-radius:8px; padding:.76rem .86rem}
+.ll-dialog .ll-card {align-content:start; grid-template-rows:auto 1fr auto; gap:.2rem}
+.ll-dialog .ll-card-note,.ll-dialog .ll-completed {font-size:.75rem; color:#c5d1d7; line-height:1.35}
+.ll-dialog .ll-card-note {color:#b0c5d3}
+.ll-dialog .ll-completed {color:#9addbd}
+.ll-dialog .dp-body .ll-card h4,.ll-dialog .dp-body .ll-entry h4 {margin:0; font-size:1.03rem; line-height:1.35; font-weight:650; overflow-wrap:anywhere}
+.ll-dialog .ll-actions {display:flex; flex-wrap:wrap; align-items:center; gap:.25rem .78rem}
+.ll-dialog .ll-card .ll-actions {margin:.42rem 0 0}
+.ll-dialog .ll-button,.ll-dialog .ll-primary,.ll-dialog .ll-link {
+  font:650 .85rem/1.25 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  width:fit-content; color:var(--dp-text); cursor:pointer; text-align:center
+}
+.ll-dialog .ll-button,.ll-dialog .ll-primary {padding:.43rem .78rem; border:1px solid #5a6d81; border-radius:6px; background:#293a50}
+.ll-dialog .ll-primary {color:#302715; background:#f2c777; border-color:#e6c87e; box-shadow:0 2px #9c804d}
+.ll-dialog .ll-link {display:inline-block; background:transparent; border:0; color:#9de3c6; padding:.35rem .12rem; text-decoration:underline; text-decoration-color:#659c89; text-underline-offset:.2em}
+.ll-dialog .ll-back {justify-self:start}
+.ll-dialog .ll-steps {margin:0; padding-left:2.5rem; display:grid; gap:.8rem}
+.ll-steps li {padding-left:.3rem; line-height:1.48}
+.ll-steps li::marker {font-weight:750; color:var(--dp-gold)}
+.ll-dialog .ll-footer {display:flex; flex-wrap:wrap; align-items:end; justify-content:space-between; gap:.8rem; padding-top:.7rem; border-top:1px solid var(--dp-line)}
+.ll-run,.ll-entry {display:flex; align-items:center; justify-content:space-between; gap:.6rem 1.1rem; flex-wrap:wrap}
+.ll-run>div:first-child,.ll-entry>div {min-width:0; flex:1 1 16rem}
+.ll-dialog .dp-body .ll-run h3 {margin:0; font-size:1.08rem}
+.ll-dialog .ll-board {min-width:0}
+.ll-dialog .ll-answer {margin:.25rem 0 0; color:#ffda8b; font-weight:700}
+@media(max-width:620px) {
+  .dp-dialog.ll-dialog {width:calc(100vw - 1.1rem);max-height:91dvh}
+  .ll-dialog .dp-body {padding:.85rem}
+  .ll-dialog .ll-cards {grid-template-columns:1fr}
+  .ll-dialog .ll-controls {display:grid}
+}
+.ll-work {font-size:.86rem; margin-top:.2rem}
+.ll-work summary {color:var(--dp-mint); cursor:pointer; width:fit-content}
+.ll-work ol {display:grid; gap:.4rem; margin:.5rem 0 .1rem; padding-left:1.45rem}
+.ll-work li {padding-left:.15rem}
+.ll-work strong {color:var(--dp-gold); display:block; font-weight:650}
+.ll-dialog .ll-overview {display:grid; grid-template-columns:1fr 1fr; gap:.8rem}
+.ll-dialog .ll-overview .ll-current {align-content:start; align-items:start; flex-direction:column; justify-content:flex-start}
+.ll-dialog .ll-overview .ll-current>div {flex:0}
+.ll-dialog .ll-recommendation {display:grid; align-content:start; justify-items:start; gap:.28rem; border:1px solid #78684d; border-left:4px solid #efc77d; border-radius:8px; background:#322e2b; padding:.9rem 1.1rem}
+.ll-dialog .ll-recommendation .ll-label {color:#f0d096}
+.ll-dialog .dp-body .ll-recommendation h3 {margin:0; font:700 1.2rem/1.25 Georgia,serif}
+.ll-dialog .ll-recommendation .ll-copy {font-size:.84rem}
+.ll-dialog .ll-recommendation progress {width:min(100%,14rem); height:.37rem; margin:.12rem 0}
+.ll-dialog .ll-recommendation progress::-webkit-progress-value {background:#e9bd71}
+.ll-dialog .ll-recommendation .ll-primary {margin-top:.18rem}
+@media(max-width:620px){.ll-dialog .ll-overview {grid-template-columns:1fr}}
+.ll-mastery-link,.ll-tracked {display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:.4rem 1rem}
+.ll-dialog .ll-mastery-link {border-bottom:1px solid var(--dp-line); padding:0 .04rem .55rem; font-size:.86rem; color:var(--dp-text)}
+.ll-dialog .ll-mastery-head progress {width:min(19rem,100%); margin:.24rem 0}
+.ll-dialog .ll-tracked {padding:.66rem .82rem; background:var(--dp-card); border:1px solid var(--dp-line); border-radius:7px}
+.ll-tracked-main {display:grid; gap:.2rem; flex:1 1 16rem}
+.ll-tracked-title {display:flex; align-items:baseline; flex-wrap:wrap; gap:.3rem .65rem}
+.ll-dialog .dp-body .ll-tracked-title h4 {margin:0; font-size:1rem}
+.ll-tracked-status {font-size:.72rem; color:var(--dp-dim)}
+.ll-tracked[data-mastery-status="Mastered"] {border-left:4px solid #80d5b2}
+.ll-tracked[data-mastery-status="Mastered"] .ll-tracked-status {color:var(--dp-mint)}
+.ll-tracked[data-mastery-status="In progress"] .ll-tracked-status {color:var(--dp-gold)}
+.ll-dialog .ll-tracked .ll-copy {font-size:.82rem}
