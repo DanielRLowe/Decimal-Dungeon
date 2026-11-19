@@ -100,6 +100,7 @@ final class GameView: NSObject, WKUIDelegate, WKNavigationDelegate {
     private let store: SaveStore
     private let entry: URL
     private(set) var loaded = false
+    var onLoaded: (() -> Void)?
     var onFailure: ((String) -> Void)?
 
     init(entry: URL, store: SaveStore, openSource: @escaping (URL) -> Void = { _ = NSWorkspace.shared.open($0) }) {
@@ -162,6 +163,7 @@ final class GameView: NSObject, WKUIDelegate, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         loaded = true
+        onLoaded?()
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {

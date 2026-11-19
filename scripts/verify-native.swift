@@ -145,6 +145,19 @@ struct SmokeTest {
         }
     }
 
+    @MainActor
+    static func hasVisibleGameWindow(_ running: NSRunningApplication) -> Bool {
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                                  kCGNullWindowID) as? [[String: Any]] ?? []
+        return windows.contains { entry in
+            guard entry[kCGWindowOwnerPID as String] as? Int32 == running.processIdentifier,
+                  entry[kCGWindowLayer as String] as? Int == 0,
+                  let bounds = entry[kCGWindowBounds as String] as? [String: CGFloat],
+                  let width = bounds["Width"], let height = bounds["Height"] else { return false }
+            return width >= 520 && height >= 440
+        }
+    }
+
     /// Launch Services uses the same application registration path as a Finder double-click.
     /// Its per-launch home override keeps this probe separate from the player's adventure.
     @MainActor
@@ -153,7 +166,7 @@ struct SmokeTest {
         let config = NSWorkspace.OpenConfiguration()
         config.createsNewApplicationInstance = true
         config.activates = false
-        config.hides = true
+        config.hides = false
         config.environment = ["CFFIXED_USER_HOME": temporaryHome.path]
         let running = try await NSWorkspace.shared.openApplication(at: app, configuration: config)
         defer { if !running.isTerminated { _ = running.terminate() } }
@@ -168,13 +181,28 @@ struct SmokeTest {
             }
         }
         guard ready else { throw CheckFailure.message("The packaged app did not create its first isolated save.") }
+        guard hasVisibleGameWindow(running) else { throw CheckFailure.message("Finder launched the game without a visible game-sized window.") }
         guard running.terminate() else { throw CheckFailure.message("Could not close the test instance cleanly.") }
         let quitDeadline = Date().addingTimeInterval(5)
         while !running.isTerminated && Date() < quitDeadline {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
         guard running.isTerminated else { throw CheckFailure.message("Test instance did not quit.") }
-        print("Finder launch verified with a fresh save under the isolated test home.")
+        // Simulate an unreadable save on the same isolated account. The launcher
+        // should leave the original bytes in place and present its startup message.
+        let badSave = Data("unreadable test adventure".utf8)
+        try badSave.write(to: save, options: .atomic)
+        let recovery = try await NSWorkspace.shared.openApplication(at: app, configuration: config)
+        defer { if !recovery.isTerminated { _ = recovery.terminate() } }
+        let errorDeadline = Date().addingTimeInterval(10)
+        while !recovery.isTerminated && !hasVisibleGameWindow(recovery) && Date() < errorDeadline {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        try await Task.sleep(nanoseconds: 500_000_000)
+        guard !recovery.isTerminated, hasVisibleGameWindow(recovery), try Data(contentsOf: save) == badSave else {
+            throw CheckFailure.message("A save error failed to keep a visible game window and preserve the original save.")
+        }
+        print("Finder launch verified with a visible game window and a fresh save under the isolated test home.")
     }
 
     @MainActor

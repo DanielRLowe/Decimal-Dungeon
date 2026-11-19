@@ -74,6 +74,12 @@ Open **Sessions** to continue a lesson, resume a particular unfinished problem, 
 
 Each Mac user has their own adventure. To bring an existing save to another Mac, quit the game on both machines. In Finder choose **Go → Go to Folder** and enter `~/Library/Application Support/Decimal Dungeon/`. Copy `progress.plist` to the same folder on the other Mac. Replacing that file replaces the destination adventure and its parent PIN.
 
+### If the Mac app bounces in the Dock
+
+If the old copy is still running, quit it before opening the updated app. The Mac launcher shows **Opening your saved adventure…** followed by **Starting the game view…**. Click its Dock icon to bring the window back. If it still stops, the last message and the macOS version in **About This Mac** help identify the failing step.
+
+The offline browser ZIP is another way to play on a Mac. Extract it into a permanent folder and open the top-level **index.html** in a regular browser window. To continue a browser adventure, return to the same folder and browser profile. The browser keeps a separate save from the native app.
+
 ## Rebuild from source
 
 On Apple Silicon with Xcode Command Line Tools, run `python3 scripts/build-mac.py` from this folder. The build script compiles the native launcher, embeds the contents of `web/`, signs the app locally, and verifies a copy extracted from the transfer archive.
